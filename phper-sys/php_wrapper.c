@@ -18,6 +18,8 @@
 #include <zend_exceptions.h>
 #include <zend_interfaces.h>
 
+#include <zend_smart_str.h>
+
 #if PHP_MAJOR_VERSION >= 8
 #include <zend_observer.h>
 #endif
@@ -31,79 +33,79 @@ phper_init_class_entry_handler(zend_class_entry *class_ce, void *argument);
 // zval apis:
 // ==================================================
 
-zend_long *phper_z_lval_p(zval *zv) {
+ZEND_FASTCALL zend_long *phper_z_lval_p(zval *zv) {
     return &(Z_LVAL_P(zv));
 }
 
-double *phper_z_dval_p(zval *zv) {
+ZEND_FASTCALL double *phper_z_dval_p(zval *zv) {
     return &(Z_DVAL_P(zv));
 }
 
-zend_string *phper_z_str_p(const zval *zv) {
+ZEND_FASTCALL zend_string *phper_z_str_p(const zval *zv) {
     return Z_STR_P(zv);
 }
 
-char *phper_z_strval_p(const zval *v) {
+ZEND_FASTCALL char *phper_z_strval_p(const zval *v) {
     return Z_STRVAL_P(v);
 }
 
-zend_array *phper_z_arr_p(const zval *zv) {
+ZEND_FASTCALL zend_array *phper_z_arr_p(const zval *zv) {
     return Z_ARR_P(zv);
 }
 
-bool phper_z_refcounted_p(zval *zval_ptr) {
+ZEND_FASTCALL bool phper_z_refcounted_p(zval *zval_ptr) {
     return Z_REFCOUNTED_P(zval_ptr);
 }
 
-int phper_z_res_handle_p(const zval *val) {
+ZEND_FASTCALL int phper_z_res_handle_p(const zval *val) {
     return Z_RES_HANDLE_P(val);
 }
 
-uint32_t phper_z_type_info_p(const zval *zv) {
+ZEND_FASTCALL uint32_t phper_z_type_info_p(const zval *zv) {
     return Z_TYPE_INFO_P(zv);
 }
 
-int phper_z_type_p(zval *zv) {
+ZEND_FASTCALL int phper_z_type_p(zval *zv) {
     return Z_TYPE_P(zv);
 }
 
-zend_resource *phper_z_res_p(const zval *zv) {
+ZEND_FASTCALL zend_resource *phper_z_res_p(const zval *zv) {
     return Z_RES_P(zv);
 }
 
-zend_reference *phper_z_ref_p(const zval *zv) {
+ZEND_FASTCALL zend_reference *phper_z_ref_p(const zval *zv) {
     return Z_REF_P(zv);
 }
 
-const zend_object_handlers *phper_z_obj_ht_p(const zval *zv) {
+ZEND_FASTCALL const zend_object_handlers *phper_z_obj_ht_p(const zval *zv) {
     return Z_OBJ_HT_P(zv);
 }
 
-zend_object *phper_z_obj_p(const zval *zv) {
+ZEND_FASTCALL zend_object *phper_z_obj_p(const zval *zv) {
     return Z_OBJ_P(zv);
 }
 
-uint32_t phper_z_addref_p(zval *zv) {
+ZEND_FASTCALL uint32_t phper_z_addref_p(zval *zv) {
     return Z_ADDREF_P(zv);
 }
 
-zend_function *phper_z_func_p(const zval *zv) {
+ZEND_FASTCALL zend_function *phper_z_func_p(const zval *zv) {
     return Z_FUNC_P(zv);
 }
 
-void *phper_z_ptr_p(const zval *zv) {
+ZEND_FASTCALL void *phper_z_ptr_p(const zval *zv) {
     return Z_PTR_P(zv);
 }
 
-zend_uchar phper_zval_get_type(const zval *pz) {
+ZEND_FASTCALL zend_uchar phper_zval_get_type(const zval *pz) {
     return zval_get_type(pz);
 }
 
-void phper_zval_arr(zval *val, zend_array *arr) {
+ZEND_FASTCALL void phper_zval_arr(zval *val, zend_array *arr) {
     ZVAL_ARR(val, arr);
 }
 
-void phper_zval_new_arr(zval *val) {
+ZEND_FASTCALL void phper_zval_new_arr(zval *val) {
 #if PHP_VERSION_ID < 80100
     ZVAL_NEW_ARR(val);
 #else
@@ -111,79 +113,79 @@ void phper_zval_new_arr(zval *val) {
 #endif
 }
 
-void phper_zval_stringl(zval *val, const char *s, size_t len) {
+ZEND_FASTCALL void phper_zval_stringl(zval *val, const char *s, size_t len) {
     ZVAL_STRINGL(val, s, len);
 }
 
-void phper_zval_zval(zval *val, zval *zv, int copy, int dtor) {
+ZEND_FASTCALL void phper_zval_zval(zval *val, zval *zv, int copy, int dtor) {
     ZVAL_ZVAL(val, zv, copy, dtor);
 }
 
-void phper_zval_copy(zval *val, const zval *zv) {
+ZEND_FASTCALL void phper_zval_copy(zval *val, const zval *zv) {
     ZVAL_COPY(val, zv);
 }
 
-void phper_zval_copy_value(zval *val, const zval *zv) {
+ZEND_FASTCALL void phper_zval_copy_value(zval *val, const zval *zv) {
     ZVAL_COPY_VALUE(val, zv);
 }
 
-zend_string *phper_zval_get_string(zval *op) {
+ZEND_FASTCALL zend_string *phper_zval_get_string(zval *op) {
     return zval_get_string(op);
 }
 
-zend_long phper_zval_get_long(zval *op) {
+ZEND_FASTCALL zend_long phper_zval_get_long(zval *op) {
     return zval_get_long(op);
 }
 
-void phper_zval_obj(zval *z, zend_object *o) {
+ZEND_FASTCALL void phper_zval_obj(zval *z, zend_object *o) {
     ZVAL_OBJ(z, o);
 }
 
-void phper_zval_func(zval *z, zend_function *f) {
+ZEND_FASTCALL void phper_zval_func(zval *z, zend_function *f) {
     ZVAL_FUNC(z, f);
 }
 
-void phper_zval_ptr_dtor(zval *zv) {
+ZEND_FASTCALL void phper_zval_ptr_dtor(zval *zv) {
     ZVAL_PTR_DTOR(zv);
 }
 
-void phper_zval_ptr_dtor_nogc(zval *zval_ptr) {
+ZEND_FASTCALL void phper_zval_ptr_dtor_nogc(zval *zval_ptr) {
     zval_ptr_dtor_nogc(zval_ptr);
 }
 
-void phper_zval_null(zval *zv) {
+ZEND_FASTCALL void phper_zval_null(zval *zv) {
     ZVAL_NULL(zv);
 }
 
-void phper_zval_true(zval *zv) {
+ZEND_FASTCALL void phper_zval_true(zval *zv) {
     ZVAL_TRUE(zv);
 }
 
-void phper_zval_false(zval *zv) {
+ZEND_FASTCALL void phper_zval_false(zval *zv) {
     ZVAL_FALSE(zv);
 }
 
-void phper_zval_long(zval *zv, zend_long l) {
+ZEND_FASTCALL void phper_zval_long(zval *zv, zend_long l) {
     ZVAL_LONG(zv, l);
 }
 
-void phper_zval_double(zval *zv, double d) {
+ZEND_FASTCALL void phper_zval_double(zval *zv, double d) {
     ZVAL_DOUBLE(zv, d);
 }
 
-void phper_zval_str(zval *zv, zend_string *s) {
+ZEND_FASTCALL void phper_zval_str(zval *zv, zend_string *s) {
     ZVAL_STR(zv, s);
 }
 
-void phper_convert_to_long(zval *op) {
+ZEND_FASTCALL void phper_convert_to_long(zval *op) {
     convert_to_long(op);
 }
 
-void phper_convert_to_string(zval *op) {
+ZEND_FASTCALL void phper_convert_to_string(zval *op) {
     convert_to_string(op);
 }
 
-void phper_separate_array(zval *zv) {
+ZEND_FASTCALL void phper_separate_array(zval *zv) {
     SEPARATE_ARRAY(zv);
 }
 
@@ -191,20 +193,20 @@ void phper_separate_array(zval *zv) {
 // string apis:
 // ==================================================
 
-zend_string *phper_zend_new_interned_string(zend_string *str) {
+ZEND_FASTCALL zend_string *phper_zend_new_interned_string(zend_string *str) {
     return zend_new_interned_string(str);
 }
 
-zend_string *phper_zend_string_init(const char *str, size_t len,
-                                    int persistent) {
+ZEND_FASTCALL zend_string *phper_zend_string_init(const char *str, size_t len,
+                                                  int persistent) {
     return zend_string_init(str, len, persistent);
 }
 
-zend_string *phper_zend_string_alloc(size_t len, int persistent) {
+ZEND_FASTCALL zend_string *phper_zend_string_alloc(size_t len, int persistent) {
     return zend_string_alloc(len, persistent);
 }
 
-void phper_zend_string_release(zend_string *s) {
+ZEND_FASTCALL void phper_zend_string_release(zend_string *s) {
     return zend_string_release(s);
 }
 
@@ -226,20 +228,119 @@ static zend_string *phper_zend_string_concat3(const char *str1, size_t str1_len,
 }
 #endif
 
-int phper_zstr_len(const zend_string *s) {
+ZEND_FASTCALL int phper_zstr_len(const zend_string *s) {
     return ZSTR_LEN(s);
 }
 
-const char *phper_zstr_val(const zend_string *s) {
+ZEND_FASTCALL const char *phper_zstr_val(const zend_string *s) {
     return ZSTR_VAL(s);
 }
 
-void phper_separate_string(zval *zv) {
+ZEND_FASTCALL void phper_separate_string(zval *zv) {
     SEPARATE_STRING(zv);
 }
 
-zend_string *phper_zend_string_copy(zend_string *s) {
+ZEND_FASTCALL zend_string *phper_zend_string_copy(zend_string *s) {
     return zend_string_copy(s);
+}
+
+// ==================================================
+// string builder apis:
+// ==================================================
+
+ZEND_FASTCALL void phper_smart_str_alloc(smart_str *str, size_t len,
+                                         bool persistent) {
+    smart_str_alloc(str, len, persistent);
+}
+
+ZEND_FASTCALL void phper_smart_str_extend_ex(smart_str *dest, size_t len,
+                                             bool persistent) {
+    smart_str_extend_ex(dest, len, persistent);
+}
+
+ZEND_FASTCALL void phper_smart_str_erealloc(smart_str *str, size_t len) {
+    smart_str_erealloc(str, len);
+}
+
+ZEND_FASTCALL void phper_smart_str_realloc(smart_str *str, size_t len) {
+    smart_str_realloc(str, len);
+}
+
+ZEND_FASTCALL void phper_smart_str_free_ex(smart_str *str, bool persistent) {
+    smart_str_free_ex(str, persistent);
+}
+
+ZEND_FASTCALL void phper_smart_str_append_escaped(smart_str *str, const char *s,
+                                                  size_t l) {
+    smart_str_append_escaped(str, s, l);
+}
+
+ZEND_FASTCALL void phper_smart_str_append_double(smart_str *str, double num,
+                                                 int precision,
+                                                 bool zero_fraction) {
+    smart_str_append_double(str, num, precision, zero_fraction);
+}
+
+ZEND_FASTCALL void phper_smart_str_append_escaped_truncated(
+    smart_str *str, const zend_string *value, size_t length) {
+    smart_str_append_escaped_truncated(str, value, length);
+}
+
+ZEND_FASTCALL void phper_smart_str_append_scalar(smart_str *str,
+                                                 const zval *value,
+                                                 size_t truncate) {
+    smart_str_append_scalar(str, value, truncate);
+}
+
+ZEND_FASTCALL void phper_smart_str_0(smart_str *str) {
+    smart_str_0(str);
+}
+
+ZEND_FASTCALL size_t phper_smart_str_get_len(const smart_str *str) {
+    return smart_str_get_len(str);
+}
+
+ZEND_FASTCALL zend_string *phper_smart_str_extract(smart_str *str) {
+    return smart_str_extract(str);
+}
+
+ZEND_FASTCALL void phper_smart_str_appendc_ex(smart_str *dest, char ch,
+                                              bool persistent) {
+    smart_str_appendc_ex(dest, ch, persistent);
+}
+
+ZEND_FASTCALL void phper_smart_str_appendl_ex(smart_str *dest, const char *str,
+                                              size_t len, bool persistent) {
+    smart_str_appendl_ex(dest, str, len, persistent);
+}
+
+ZEND_FASTCALL void phper_smart_str_append_ex(smart_str *dest,
+                                             const zend_string *src,
+                                             bool persistent) {
+    smart_str_append_ex(dest, src, persistent);
+}
+
+ZEND_FASTCALL void phper_smart_str_append_smart_str_ex(smart_str *dest,
+                                                       const smart_str *src,
+                                                       bool persistent) {
+    smart_str_append_smart_str_ex(dest, src, persistent);
+}
+
+ZEND_FASTCALL void phper_smart_str_append_long_ex(smart_str *dest,
+                                                  zend_long num,
+                                                  bool persistent) {
+    smart_str_append_long_ex(dest, num, persistent);
+}
+
+ZEND_FASTCALL void phper_smart_str_append_unsigned_ex(smart_str *dest,
+                                                      zend_ulong num,
+                                                      bool persistent) {
+    smart_str_append_unsigned_ex(dest, num, persistent);
+}
+
+ZEND_FASTCALL void phper_smart_str_setl(smart_str *dest, const char *src,
+                                        size_t len) {
+    smart_str_setl(dest, src, len);
 }
 
 // ==================================================

@@ -96,13 +96,13 @@ impl ZStr {
     /// Converts to a raw C string pointer.
     #[inline]
     pub fn as_c_str_ptr(&self) -> *const c_char {
-        unsafe { phper_zstr_val(&self.inner).cast() }
+        self.inner.val.as_ptr()
     }
 
     /// Gets the inner C string length.
     #[inline]
     pub fn len(&self) -> usize {
-        unsafe { phper_zstr_len(&self.inner).try_into().unwrap() }
+        self.inner.len
     }
 
     /// Returns `true` if `self` has a length of zero bytes.
@@ -131,6 +131,24 @@ impl ZStr {
     /// Yields a str slice if the `ZStr` contains valid UTF-8.
     pub fn to_str(&self) -> Result<&str, Utf8Error> {
         str::from_utf8(self.to_bytes())
+    }
+}
+
+impl Into<*mut zend_string> for &mut ZStr {
+    fn into(self) -> *mut zend_string {
+        &mut self.inner
+    }
+}
+
+impl Into<*const zend_string> for &mut ZStr {
+    fn into(self) -> *const zend_string {
+        &mut self.inner
+    }
+}
+
+impl Into<*const c_char> for &ZStr {
+    fn into(self) -> *const c_char {
+        self.as_c_str_ptr()
     }
 }
 

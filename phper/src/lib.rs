@@ -26,6 +26,7 @@ pub mod objects;
 pub mod output;
 pub mod references;
 pub mod resources;
+pub mod smart_str;
 pub mod strings;
 pub mod types;
 mod utils;
