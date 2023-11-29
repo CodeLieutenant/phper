@@ -31,14 +31,9 @@ The framework that allows us to write PHP extensions using pure and safe Rust wh
   - [ ] ~~windows~~
 - **PHP**
   - **version**
-    - [x] 7.0
-    - [x] 7.1
-    - [x] 7.2
-    - [x] 7.3
-    - [x] 7.4
-    - [x] 8.0
     - [x] 8.1
     - [x] 8.2
+    - [x] 8.3
   - **mode**
     - [x] nts
     - [ ] ~~zts~~
@@ -56,6 +51,7 @@ See [examples](https://github.com/phper-framework/phper/tree/master/examples).
 ## The projects using PHPER
 
 - [apache/skywalking-php](https://github.com/apache/skywalking-php) - The PHP Agent for Apache SkyWalking, which provides the native tracing abilities for PHP project.
+- [he4rt/scylladb-php-driver](https://github.com/he4rt/scylladb-php-driver/tree/v2) - ScyllaDB/Apache Cassandra Driver for PHP
 
 ## License
 
