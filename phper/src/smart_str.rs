@@ -126,6 +126,12 @@ impl ZSmartStr {
         }
     }
 
+    /// Checks if the smart_str is empty
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Retuns number of bytes allocated for the smart str.
     #[inline]
     pub fn allocated_size(&self) -> usize {
@@ -167,7 +173,9 @@ impl ZSmartStr {
 
     #[inline]
     pub fn append_string_escaped(
-        &mut self, str: impl Into<*const c_char>, len: usize,
+        &mut self,
+        str: impl Into<*const c_char>,
+        len: usize,
     ) -> &mut Self {
         unsafe {
             smart_str_append_escaped(&mut self.inner, str.into(), len);
@@ -179,7 +187,9 @@ impl ZSmartStr {
     /// Appends zend_string up to the supplied length and escapes it.
     #[inline]
     pub fn append_string_escaped_truncated(
-        &mut self, str: impl Into<*mut zend_string>, len: usize,
+        &mut self,
+        str: impl Into<*mut zend_string>,
+        len: usize,
     ) -> &mut Self {
         unsafe {
             smart_str_append_escaped_truncated(&mut self.inner, str.into(), len);
@@ -229,7 +239,10 @@ impl ZSmartStr {
     /// Appends float to the smart str.
     #[inline]
     pub fn append_float(
-        &mut self, num: impl Into<f32>, precision: i32, zero_fraction: bool,
+        &mut self,
+        num: impl Into<f32>,
+        precision: i32,
+        zero_fraction: bool,
     ) -> &mut Self {
         unsafe {
             phper_smart_str_append_double(
@@ -257,7 +270,10 @@ impl ZSmartStr {
 
     #[inline]
     pub fn append_double(
-        &mut self, num: impl Into<f64>, precision: i32, zero_fraction: bool,
+        &mut self,
+        num: impl Into<f64>,
+        precision: i32,
+        zero_fraction: bool,
     ) -> &mut Self {
         unsafe {
             phper_smart_str_append_double(&mut self.inner, num.into(), precision, zero_fraction)

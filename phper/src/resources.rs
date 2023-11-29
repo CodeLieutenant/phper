@@ -11,15 +11,24 @@
 //! Apis relate to [zend_resource].
 
 use crate::sys::*;
+use std::ffi::c_void;
 use std::fmt::{self, Debug};
+use std::marker::PhantomData;
 
 /// Wrapper of [zend_resource].
 #[repr(transparent)]
-pub struct ZRes {
+pub struct ZRes<T> {
     inner: zend_resource,
+    _data: PhantomData<T>,
 }
 
-impl ZRes {
+#[repr(transparent)]
+pub struct ZPersistentResource<T> {
+    inner: *const zend_resource,
+    _data: PhantomData<T>,
+}
+
+impl<T> ZRes<T> {
     /// Wraps a raw pointer.
     ///
     /// # Safety
@@ -82,12 +91,101 @@ impl ZRes {
     pub fn handle(&self) -> i64 {
         self.inner.handle.into()
     }
+
+    /// Casts a zend_resource.ptr to &mut T
+    pub fn value_mut(&mut self) -> &mut T {
+        unsafe { &mut *(self.inner.ptr as *mut T) }
+    }
+
+    /// Casts a zend_resource.ptr to &T
+    pub fn value(&self) -> &T {
+        unsafe { &*(self.inner.ptr as *const T) }
+    }
 }
 
-impl Debug for ZRes {
+impl<T> Debug for ZRes<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ZRes")
             .field("handle", &self.handle())
             .finish()
+    }
+}
+
+extern "C" fn clean_persistent_resource<T, Fn>(res: *mut zend_resource)
+where
+    Fn: FnOnce(&mut T),
+{
+    let mut x = unsafe { Box::from_raw((*res).ptr as *mut PersistentResourceCleanup<T, Fn>) };
+
+    if let Some(cleanup) = x.cleanup {
+        cleanup(&mut x.value)
+    }
+}
+
+struct PersistentResourceCleanup<T, TFn>
+where
+    TFn: FnOnce(&mut T),
+{
+    value: T,
+    cleanup: Option<TFn>,
+}
+
+impl<T> ZPersistentResource<T> {
+    /// Creates new Zend Persistent Resource
+    pub fn new(hash: impl Into<crate::strings::ZString>, name: &'static str, value: T) -> Self {
+        Self::new_with_cleanup(hash, name, value, Option::<Box<dyn FnOnce(&mut T)>>::None)
+    }
+
+    /// Creates new Zend Persistent Resource with Cleanup function
+    pub fn new_with_cleanup<Fn: FnOnce(&mut T)>(
+        hash: impl Into<crate::strings::ZString>,
+        name: &'static str,
+        value: T,
+        cleanup: Option<Fn>,
+    ) -> Self {
+        let resource = unsafe {
+            let id: i32 = phper_zend_register_persistent_list_destructors(
+                Some(clean_persistent_resource::<T, Fn>),
+                name.as_ptr() as *const i8,
+                crate::modules::GLOBAL_MODULE_NUMBER,
+            );
+            let hash = hash.into().into_raw();
+            let boxed = Box::into_raw(Box::new(PersistentResourceCleanup { value, cleanup }));
+            phper_register_persistent_resource(hash, boxed as *mut c_void, id)
+                as *const zend_resource
+        };
+
+        Self {
+            inner: resource,
+            _data: Default::default(),
+        }
+    }
+
+    /// Find zend resource by resource name
+    pub fn find<'a>(hash: impl AsRef<&'a str>) -> Option<Self> {
+        // TODO: Should be nice if we checked the ID for the TYPE
+        let resource = unsafe {
+            let hash: &'a str = hash.as_ref();
+            phper_register_persistent_find(hash.as_ptr() as *const i8, hash.len())
+        };
+
+        if !resource.is_null() {
+            Some(Self {
+                inner: resource,
+                _data: Default::default(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Extract value from the Resource
+    pub fn value(&self) -> &T {
+        unsafe {
+            let value = &*((*self.inner).ptr
+                as *const PersistentResourceCleanup<T, Box<dyn FnOnce(&mut T)>>);
+
+            &value.value
+        }
     }
 }

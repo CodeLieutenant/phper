@@ -463,28 +463,28 @@ impl ZVal {
     }
 
     /// Converts to resource if `ZVal` is resource.
-    pub fn as_z_res(&self) -> Option<&ZRes> {
-        self.expect_z_res().ok()
+    pub fn as_z_res<T>(&self) -> Option<&ZRes<T>> {
+        self.expect_z_res::<T>().ok()
     }
 
     /// Converts to resource if `ZVal` is resource, otherwise returns
     /// [`ExpectTypeError`].
-    pub fn expect_z_res(&self) -> crate::Result<&ZRes> {
-        self.inner_expect_z_res().map(|x| &*x)
+    pub fn expect_z_res<T>(&self) -> crate::Result<&ZRes<T>> {
+        self.inner_expect_z_res::<T>().map(|x| &*x)
     }
 
     /// Converts to mutable resource if `ZVal` is null.
-    pub fn as_mut_z_res(&mut self) -> Option<&mut ZRes> {
+    pub fn as_mut_z_res<T>(&mut self) -> Option<&mut ZRes<T>> {
         self.expect_mut_z_res().ok()
     }
 
     /// Converts to mutable resource if `ZVal` is resource, otherwise returns
     /// [`ExpectTypeError`].
-    pub fn expect_mut_z_res(&mut self) -> crate::Result<&mut ZRes> {
-        self.inner_expect_z_res()
+    pub fn expect_mut_z_res<T>(&mut self) -> crate::Result<&mut ZRes<T>> {
+        self.inner_expect_z_res::<T>()
     }
 
-    fn inner_expect_z_res(&self) -> crate::Result<&mut ZRes> {
+    fn inner_expect_z_res<T>(&self) -> crate::Result<&mut ZRes<T>> {
         if self.get_type_info().is_resource() {
             unsafe { Ok(ZRes::from_mut_ptr(phper_z_res_p(self.as_ptr()))) }
         } else {
@@ -592,7 +592,7 @@ impl Debug for ZVal {
                 d.field(&v);
             }
         } else if t.is_resource() {
-            if let Some(v) = self.as_z_res() {
+            if let Some(v) = self.as_z_res::<()>() {
                 d.field(&v);
             }
         } else if t.is_reference() {

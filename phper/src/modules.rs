@@ -34,11 +34,22 @@ use std::{
 /// Global pointer hold the Module builder.
 /// Because PHP is single threaded, so there is no lock here.
 static mut GLOBAL_MODULE: *mut Module = null_mut();
+pub(crate) static mut GLOBAL_MODULE_NUMBER: i32 = 0;
 
 static mut GLOBAL_MODULE_ENTRY: *mut zend_module_entry = null_mut();
 
+/// PHP Module information
+pub struct ModuleInfo {
+    /// Module Type
+    pub ty: i32,
+
+    /// Module Number -> Order in which modules are loaded
+    pub number: i32,
+}
+
 unsafe extern "C" fn module_startup(_type: c_int, module_number: c_int) -> c_int {
     let module = GLOBAL_MODULE.as_mut().unwrap();
+    GLOBAL_MODULE_NUMBER = module_number;
 
     ini::register(&module.ini_entities, module_number);
 
@@ -56,7 +67,10 @@ unsafe extern "C" fn module_startup(_type: c_int, module_number: c_int) -> c_int
     }
 
     if let Some(f) = take(&mut module.module_init) {
-        f();
+        f(ModuleInfo {
+            ty: _type,
+            number: module_number,
+        });
     }
 
     ZEND_RESULT_CODE_SUCCESS
@@ -68,27 +82,36 @@ unsafe extern "C" fn module_shutdown(_type: c_int, module_number: c_int) -> c_in
     ini::unregister(module_number);
 
     if let Some(f) = take(&mut module.module_shutdown) {
-        f();
+        f(ModuleInfo {
+            ty: _type,
+            number: module_number,
+        });
     }
 
     ZEND_RESULT_CODE_SUCCESS
 }
 
-unsafe extern "C" fn request_startup(_type: c_int, _module_number: c_int) -> c_int {
+unsafe extern "C" fn request_startup(_type: c_int, module_number: c_int) -> c_int {
     let module = GLOBAL_MODULE.as_ref().unwrap();
 
     if let Some(f) = &module.request_init {
-        f();
+        f(ModuleInfo {
+            ty: _type,
+            number: module_number,
+        });
     }
 
     ZEND_RESULT_CODE_SUCCESS
 }
 
-unsafe extern "C" fn request_shutdown(_type: c_int, _module_number: c_int) -> c_int {
+unsafe extern "C" fn request_shutdown(_type: c_int, module_number: c_int) -> c_int {
     let module = GLOBAL_MODULE.as_ref().unwrap();
 
     if let Some(f) = &module.request_shutdown {
-        f();
+        f(ModuleInfo {
+            ty: _type,
+            number: module_number,
+        });
     }
 
     ZEND_RESULT_CODE_SUCCESS
@@ -118,10 +141,10 @@ pub struct Module {
     name: CString,
     version: CString,
     author: CString,
-    module_init: Option<Box<dyn FnOnce()>>,
-    module_shutdown: Option<Box<dyn FnOnce()>>,
-    request_init: Option<Box<dyn Fn()>>,
-    request_shutdown: Option<Box<dyn Fn()>>,
+    module_init: Option<Box<dyn FnOnce(ModuleInfo)>>,
+    module_shutdown: Option<Box<dyn FnOnce(ModuleInfo)>>,
+    request_init: Option<Box<dyn Fn(ModuleInfo)>>,
+    request_shutdown: Option<Box<dyn Fn(ModuleInfo)>>,
     function_entities: Vec<FunctionEntity>,
     class_entities: Vec<ClassEntity<()>>,
     interface_entities: Vec<InterfaceEntity>,
@@ -133,7 +156,9 @@ pub struct Module {
 impl Module {
     /// Construct the `Module` with base metadata.
     pub fn new(
-        name: impl Into<String>, version: impl Into<String>, author: impl Into<String>,
+        name: impl Into<String>,
+        version: impl Into<String>,
+        author: impl Into<String>,
     ) -> Self {
         Self {
             name: ensure_end_with_zero(name),
@@ -153,28 +178,30 @@ impl Module {
     }
 
     /// Register `MINIT` hook.
-    pub fn on_module_init(&mut self, func: impl FnOnce() + 'static) {
+    pub fn on_module_init(&mut self, func: impl FnOnce(ModuleInfo) + 'static) {
         self.module_init = Some(Box::new(func));
     }
 
     /// Register `MSHUTDOWN` hook.
-    pub fn on_module_shutdown(&mut self, func: impl FnOnce() + 'static) {
+    pub fn on_module_shutdown(&mut self, func: impl FnOnce(ModuleInfo) + 'static) {
         self.module_shutdown = Some(Box::new(func));
     }
 
     /// Register `RINIT` hook.
-    pub fn on_request_init(&mut self, func: impl Fn() + 'static) {
+    pub fn on_request_init(&mut self, func: impl Fn(ModuleInfo) + 'static) {
         self.request_init = Some(Box::new(func));
     }
 
     /// Register `RSHUTDOWN` hook.
-    pub fn on_request_shutdown(&mut self, func: impl Fn() + 'static) {
+    pub fn on_request_shutdown(&mut self, func: impl Fn(ModuleInfo) + 'static) {
         self.request_shutdown = Some(Box::new(func));
     }
 
     /// Register function to module.
     pub fn add_function<F, Z, E>(
-        &mut self, name: impl Into<String>, handler: F,
+        &mut self,
+        name: impl Into<String>,
+        handler: F,
     ) -> &mut FunctionEntity
     where
         F: Fn(&mut [ZVal]) -> Result<Z, E> + 'static,
@@ -203,7 +230,9 @@ impl Module {
 
     /// Register ini configuration to module.
     pub fn add_ini(
-        &mut self, name: impl Into<String>, default_value: impl ini::IntoIniValue,
+        &mut self,
+        name: impl Into<String>,
+        default_value: impl ini::IntoIniValue,
         policy: ini::Policy,
     ) {
         self.ini_entities

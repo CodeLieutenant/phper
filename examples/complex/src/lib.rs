@@ -50,10 +50,10 @@ pub fn get_module() -> Module {
     );
 
     // register hook functions
-    module.on_module_init(|| {});
-    module.on_module_shutdown(|| {});
-    module.on_request_init(|| {});
-    module.on_request_shutdown(|| {});
+    module.on_module_init(|_info| {});
+    module.on_module_shutdown(|_info| {});
+    module.on_request_init(|_info| {});
+    module.on_request_shutdown(|_info| {});
 
     // register functions
     module

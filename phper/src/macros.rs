@@ -94,6 +94,30 @@ macro_rules! eg {
     };
 }
 
+/// Equivalent to the php `EG(persistent_list)`.
+#[macro_export]
+macro_rules! persistent_list_mut {
+    () => {
+        unsafe {
+            $crate::arrays::ZArr::from_mut_ptr(
+                &mut $crate::sys::executor_globals.persistent_list as *mut $crate::sys::_zend_array,
+            )
+        }
+    };
+}
+
+/// Equivalent to the php `EG(persistent_list)`.
+#[macro_export]
+macro_rules! persistent_list {
+    () => {
+        unsafe {
+            $crate::arrays::ZArr::from_ptr(
+                &$crate::sys::executor_globals.persistent_list as *const $crate::sys::_zend_array,
+            )
+        }
+    };
+}
+
 /// Equivalent to the php `PG`.
 #[macro_export]
 macro_rules! pg {

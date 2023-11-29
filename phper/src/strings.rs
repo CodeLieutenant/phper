@@ -12,6 +12,7 @@
 
 use crate::sys::*;
 use phper_alloc::ToRefOwned;
+use std::str::Utf8Error;
 use std::{
     borrow::Borrow,
     convert::TryInto,
@@ -22,9 +23,11 @@ use std::{
     ops::{Deref, DerefMut},
     os::raw::c_char,
     slice::from_raw_parts,
-    str,
-    str::Utf8Error,
 };
+
+pub unsafe trait IntoStr<'a> {
+    fn into_str(&'a self) -> &'a str;
+}
 
 /// Like str, CStr for [zend_string].
 #[repr(transparent)]
@@ -130,7 +133,13 @@ impl ZStr {
 
     /// Yields a str slice if the `ZStr` contains valid UTF-8.
     pub fn to_str(&self) -> Result<&str, Utf8Error> {
-        str::from_utf8(self.to_bytes())
+        std::str::from_utf8(self.to_bytes())
+    }
+}
+
+unsafe impl<'a> IntoStr<'a> for ZStr {
+    fn into_str(&'a self) -> &'a str {
+        unsafe { std::str::from_utf8_unchecked(self.to_bytes()) }
     }
 }
 
@@ -234,6 +243,12 @@ impl ZString {
     }
 }
 
+unsafe impl<'a> IntoStr<'a> for ZString {
+    fn into_str(&'a self) -> &'a str {
+        unsafe { std::str::from_utf8_unchecked(self.to_bytes()) }
+    }
+}
+
 impl Debug for ZString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         common_fmt(self, f, "ZString")
@@ -283,7 +298,8 @@ impl AsRef<[u8]> for ZString {
 
 impl<Rhs: AsRef<[u8]>> PartialEq<Rhs> for ZString {
     fn eq(&self, other: &Rhs) -> bool {
-        self.as_ref() == other.as_ref()
+        let zstring: &[u8] = self.as_ref();
+        zstring == other.as_ref()
     }
 }
 

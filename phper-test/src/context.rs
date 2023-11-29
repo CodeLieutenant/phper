@@ -68,7 +68,9 @@ impl Context {
     }
 
     pub fn create_command_with_lib(
-        &self, lib_path: impl AsRef<Path>, script: impl AsRef<Path>,
+        &self,
+        lib_path: impl AsRef<Path>,
+        script: impl AsRef<Path>,
     ) -> ContextCommand {
         let mut cmd = Command::new(&self.php_bin);
         let args = vec![

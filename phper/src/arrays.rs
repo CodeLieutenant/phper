@@ -38,11 +38,11 @@ pub enum Key<'a> {
 /// Insert key for [ZArr].
 #[derive(Debug, Clone, PartialEq, From)]
 pub enum InsertKey<'a> {
-    /// Insert with next index type key, like `$arr[] = "foo"` in PHP.
+    /// Insert with next index type key, like `$farr[] = "oo"` in PHP.
     NextIndex,
-    /// Insert with index type key.
+    /// Insert with index type key, like `$farr[0] = "oo"` in PHP.
     Index(u64),
-    /// Insert with string type key.
+    /// Insert with string type key, like `$farr["string"] = "oo"` in PHP.
     Str(&'a str),
     /// Insert with string type key.
     Bytes(&'a [u8]),
@@ -142,8 +142,6 @@ impl ZArr {
 
     /// Add or update item by key.
     ///
-    /// Notice that phper prefer to use [`Symtables`](https://www.phpinternalsbook.com/php5/hashtables/array_api.html#symtables) api `zend_symtable_*`,
-    /// so `insert(42)` and `insert("42")` should be considered the same.
     #[allow(clippy::useless_conversion)]
     pub fn insert<'a>(&mut self, key: impl Into<InsertKey<'a>>, value: impl Into<ZVal>) {
         let key = key.into();
@@ -159,7 +157,7 @@ impl ZArr {
                     phper_zend_hash_index_update(self.as_mut_ptr(), i, val);
                 }
                 InsertKey::Str(s) => {
-                    phper_zend_symtable_str_update(
+                    phper_zend_str_update(
                         self.as_mut_ptr(),
                         s.as_ptr().cast(),
                         s.len().try_into().unwrap(),
@@ -167,7 +165,7 @@ impl ZArr {
                     );
                 }
                 InsertKey::Bytes(b) => {
-                    phper_zend_symtable_str_update(
+                    phper_zend_str_update(
                         self.as_mut_ptr(),
                         b.as_ptr().cast(),
                         b.len().try_into().unwrap(),
@@ -175,7 +173,7 @@ impl ZArr {
                     );
                 }
                 InsertKey::ZStr(s) => {
-                    phper_zend_symtable_str_update(
+                    phper_zend_str_update(
                         self.as_mut_ptr(),
                         s.as_c_str_ptr().cast(),
                         s.len().try_into().unwrap(),
@@ -188,16 +186,12 @@ impl ZArr {
 
     /// Get item by key.
     ///
-    /// Notice that phper prefer to use [`Symtables`](https://www.phpinternalsbook.com/php5/hashtables/array_api.html#symtables) api `zend_symtable_*`,
-    /// so `get(42)` and `get("42")` should be considered the same.
     pub fn get<'a>(&self, key: impl Into<Key<'a>>) -> Option<&'a ZVal> {
         self.inner_get(key).map(|v| &*v)
     }
 
     /// Get item by key.
     ///
-    /// Notice that phper prefer to use [`Symtables`](https://www.phpinternalsbook.com/php5/hashtables/array_api.html#symtables) api `zend_symtable_*`,
-    /// so `get_mut(42)` and `get_mut("42")` should be considered the same.
     pub fn get_mut<'a>(&mut self, key: impl Into<Key<'a>>) -> Option<&'a mut ZVal> {
         self.inner_get(key)
     }
@@ -209,18 +203,18 @@ impl ZArr {
         unsafe {
             let value = match key {
                 Key::Index(i) => phper_zend_hash_index_find(ptr, i),
-                Key::Str(s) => phper_zend_symtable_str_find(
+                Key::Str(s) => phper_zend_str_find(
                     ptr,
                     s.as_ptr().cast(),
                     s.len().try_into().unwrap(),
                 ),
-                Key::Bytes(b) => phper_zend_symtable_str_find(
+                Key::Bytes(b) => phper_zend_str_find(
                     ptr,
                     b.as_ptr().cast(),
                     b.len().try_into().unwrap(),
                 ),
                 Key::ZStr(s) => {
-                    phper_zend_symtable_str_find(ptr, s.as_c_str_ptr(), s.len().try_into().unwrap())
+                    phper_zend_str_find(ptr, s.as_c_str_ptr(), s.len().try_into().unwrap())
                 }
             };
             if value.is_null() {
@@ -233,8 +227,6 @@ impl ZArr {
 
     /// Check if the key exists.
     ///
-    /// Notice that phper prefer to use [`Symtables`](https://www.phpinternalsbook.com/php5/hashtables/array_api.html#symtables) api `zend_symtable_*`,
-    /// so `exists(42)` and `exists("42")` should be considered the same.
     #[allow(clippy::useless_conversion)]
     pub fn exists<'a>(&self, key: impl Into<Key<'a>>) -> bool {
         let key = key.into();
@@ -242,17 +234,17 @@ impl ZArr {
         unsafe {
             match key {
                 Key::Index(i) => phper_zend_hash_index_exists(ptr, i),
-                Key::Str(s) => phper_zend_symtable_str_exists(
+                Key::Str(s) => phper_zend_str_exists(
                     ptr,
                     s.as_ptr().cast(),
                     s.len().try_into().unwrap(),
                 ),
-                Key::Bytes(b) => phper_zend_symtable_str_exists(
+                Key::Bytes(b) => phper_zend_str_exists(
                     ptr,
                     b.as_ptr().cast(),
                     b.len().try_into().unwrap(),
                 ),
-                Key::ZStr(s) => phper_zend_symtable_str_exists(
+                Key::ZStr(s) => phper_zend_str_exists(
                     ptr,
                     s.to_bytes().as_ptr().cast(),
                     s.len().try_into().unwrap(),
@@ -263,25 +255,23 @@ impl ZArr {
 
     /// Remove the item under the key
     ///
-    /// Notice that phper prefer to use [`Symtables`](https://www.phpinternalsbook.com/php5/hashtables/array_api.html#symtables) api `zend_symtable_*`,
-    /// so `remove(42)` and `remove("42")` should be considered the same.
     #[allow(clippy::useless_conversion)]
     pub fn remove<'a>(&mut self, key: impl Into<Key<'a>>) -> bool {
         let key = key.into();
         unsafe {
             match key {
                 Key::Index(i) => phper_zend_hash_index_del(&mut self.inner, i),
-                Key::Str(s) => phper_zend_symtable_str_del(
+                Key::Str(s) => phper_zend_str_del(
                     &mut self.inner,
                     s.as_ptr().cast(),
                     s.len().try_into().unwrap(),
                 ),
-                Key::Bytes(b) => phper_zend_symtable_str_del(
+                Key::Bytes(b) => phper_zend_str_del(
                     &mut self.inner,
                     b.as_ptr().cast(),
                     b.len().try_into().unwrap(),
                 ),
-                Key::ZStr(s) => phper_zend_symtable_str_del(
+                Key::ZStr(s) => phper_zend_str_del(
                     &mut self.inner,
                     s.as_c_str_ptr().cast(),
                     s.len().try_into().unwrap(),
