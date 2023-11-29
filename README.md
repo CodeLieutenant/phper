@@ -19,16 +19,15 @@ The framework that allows us to write PHP extensions using pure and safe Rust wh
 
 ### Necessary
 
-- **rust** 1.67 or later
+- **rust** 1.74 or later
 - **libclang** 9.0 or later
-- **php** 7.0 or later
+- **php** 8.1 or later
 
 ### Tested Support
 
 - **OS**
   - [x] linux
   - [x] macos
-  - [ ] ~~windows~~
 - **PHP**
   - **version**
     - [x] 8.1
