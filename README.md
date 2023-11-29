@@ -10,16 +10,16 @@
 
 The framework that allows us to write PHP extensions using pure and safe Rust whenever possible.
 
-## Document & Tutorial
+## Documentation & Tutorial
 
-- Document: <https://docs.rs/phper>
+- Documentation: <https://docs.rs/phper>
 - Tutorial: <https://docs.rs/phper-doc/>
 
 ## Requirement
 
 ### Necessary
 
-- **rust** 1.65 or later
+- **rust** 1.67 or later
 - **libclang** 9.0 or later
 - **php** 7.0 or later
 
