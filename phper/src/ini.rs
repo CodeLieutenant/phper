@@ -10,8 +10,8 @@
 
 //! Apis relate to [zend_ini_entry_def].
 
+use crate::c_str;
 use crate::strings::ZString;
-use crate::{c_str, sys::*};
 use std::ffi::{c_uchar, c_void};
 use std::{
     ffi::{c_int, CStr},
@@ -40,7 +40,7 @@ pub fn ini_get<T: FromIniValue>(name: &str) -> T {
 
 /// Configuration changeable policy.
 #[repr(u32)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Policy {
     /// Entry can be set anywhere.
     All = PHP_INI_ALL,
@@ -53,23 +53,21 @@ pub enum Policy {
     System = PHP_INI_SYSTEM,
 }
 
-/// Configuration for INI Display Options.
-#[repr(u32)]
-#[derive(Copy, Clone)]
-pub enum Display {
-    Original = ZEND_INI_DISPLAY_ORIG,
-    Active = ZEND_INI_DISPLAY_ACTIVE,
-}
-
 /// Configuration for INI Stage.
 #[repr(i32)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Stage {
+    /// INI Load Event -> Startup -> PHP Started
     Startup = ZEND_INI_STAGE_STARTUP as i32,
+    /// INI Event -> PHP Shutting down
     Shutdown = ZEND_INI_STAGE_SHUTDOWN as i32,
+    /// INI Event -> PHP Module Activated
     Activate = ZEND_INI_STAGE_ACTIVATE as i32,
+    /// INI Event -> PHP Module Deactivated
     Deactivate = ZEND_INI_STAGE_DEACTIVATE as i32,
+    /// INI Event -> Value changed with ini_set from PHP
     Runtime = ZEND_INI_STAGE_RUNTIME as i32,
+    /// INI Event -> Value changed from .htaccess file with php_ini directive
     Htacces = ZEND_INI_STAGE_HTACCESS as i32,
 }
 
@@ -85,30 +83,36 @@ enum PHPIniFunction<T> {
     DefaultValue(unsafe extern "C" fn(*const c_char, usize, c_int) -> T),
 }
 
-impl TryFrom<i32> for Stage {
-    type Error = Box<dyn std::error::Error>;
+macro_rules! try_from_stage_int {
+    ($arg: ty) => {
+        impl TryFrom<$arg> for Stage {
+            type Error = Box<dyn std::error::Error>;
 
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        let (startup, shutdown, activate, deactivate, runtime, htaccess) = (
-            ZEND_INI_STAGE_STARTUP as i32,
-            ZEND_INI_STAGE_SHUTDOWN as i32,
-            ZEND_INI_STAGE_ACTIVATE as i32,
-            ZEND_INI_STAGE_DEACTIVATE as i32,
-            ZEND_INI_STAGE_RUNTIME as i32,
-            ZEND_INI_STAGE_HTACCESS as i32,
-        );
-
-        match value {
-            startup => Ok(Stage::Startup),
-            shutdown => Ok(Stage::Shutdown),
-            activate => Ok(Stage::Activate),
-            deactivate => Ok(Self::Deactivate),
-            runtime => Ok(Stage::Runtime),
-            htaccess => Ok(Stage::Htacces),
-            _ => Err("Invalid Zend Stage for INI values".into()),
+            fn try_from(value: $arg) -> Result<Self, Self::Error> {
+                match value as u32 {
+                    ZEND_INI_STAGE_STARTUP => Ok(Stage::Startup),
+                    ZEND_INI_STAGE_SHUTDOWN => Ok(Stage::Shutdown),
+                    ZEND_INI_STAGE_ACTIVATE => Ok(Stage::Activate),
+                    ZEND_INI_STAGE_DEACTIVATE => Ok(Self::Deactivate),
+                    ZEND_INI_STAGE_RUNTIME => Ok(Stage::Runtime),
+                    ZEND_INI_STAGE_HTACCESS => Ok(Stage::Htacces),
+                    _ => Err("Invalid Zend Stage for INI values".into()),
+                }
+            }
         }
-    }
+    };
 }
+
+try_from_stage_int!(i8);
+try_from_stage_int!(i16);
+try_from_stage_int!(i32);
+try_from_stage_int!(i64);
+try_from_stage_int!(isize);
+try_from_stage_int!(u8);
+try_from_stage_int!(u16);
+try_from_stage_int!(u32);
+try_from_stage_int!(u64);
+try_from_stage_int!(usize);
 
 impl IntoIniValue for bool {
     #[inline]
@@ -236,6 +240,28 @@ impl FromIniValue for &str {
     }
 }
 
+/// Zend INI Entry
+pub struct Entry {
+    /// Has Entry been modified
+    pub modified: bool,
+    /// Name of the INI Entry
+    pub name: ZString,
+    /// Current value before change
+    pub value: ZString,
+}
+
+impl From<&_zend_ini_entry> for Entry {
+    fn from(value: &_zend_ini_entry) -> Self {
+        unsafe {
+            Self {
+                modified: value.modified > 0,
+                name: ZString::from_raw(value.name),
+                value: ZString::from_raw(value.value),
+            }
+        }
+    }
+}
+
 unsafe extern "C" fn on_modify<T: OnModify>(
     entry: *mut _zend_ini_entry, new_value: *mut _zend_string, arg1: *mut c_void,
     _arg2: *mut c_void, _arg3: *mut c_void, stage: i32,
@@ -249,22 +275,35 @@ unsafe extern "C" fn on_modify<T: OnModify>(
 
     let modify = &mut on_modify_item.on_modify;
 
-    modify
-        .on_modify(ZString::from_raw(new_value), stage)
+    let result = modify
+        .on_modify(
+            Entry::from(&*(entry as *const _zend_ini_entry)),
+            ZString::from_raw(new_value),
+            stage,
+        )
         .map(|_| ZEND_RESULT_CODE_SUCCESS)
         .map_err(|_| ZEND_RESULT_CODE_FAILURE)
-        .unwrap()
+        .unwrap();
+
+    // Prevent memory leaks
+    if stage == Stage::Shutdown || stage == Stage::Deactivate {
+        let _item = Box::from_raw(on_modify_item);
+    }
+
+    result
 }
 
+/// On INI Change Trait
 pub trait OnModify {
+    /// Called whenever INI has chaged
     fn on_modify(
-        &mut self, new_value: ZString, stage: Stage,
+        &mut self, entry: Entry, new_value: ZString, stage: Stage,
     ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 impl OnModify for () {
     fn on_modify(
-        &mut self, new_value: ZString, stage: Stage,
+        &mut self, _entry: Entry, _new_value: ZString, _stage: Stage,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }

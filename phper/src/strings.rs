@@ -26,8 +26,13 @@ use std::{
 };
 
 /// Unsafe implementation for &'a str conversion from T
-pub unsafe trait IntoStr<'a> {
-    fn into_str(&'a self) -> &'a str;
+///
+/// # Safety
+/// Coverting to str from ZString or ZStr when you are sure UTF-8 Is the only possible impl
+pub unsafe trait ToStr<'a> {
+    /// Converts a Type to &str
+    #[allow(clippy::wrong_self_convention)]
+    fn to_unsafe_str(&'a self) -> &'a str;
 }
 
 /// Like str, CStr for [zend_string].
@@ -138,24 +143,27 @@ impl ZStr {
     }
 }
 
-unsafe impl<'a> IntoStr<'a> for ZStr {
-    fn into_str(&'a self) -> &'a str {
+unsafe impl<'a> ToStr<'a> for ZStr {
+    fn to_unsafe_str(&'a self) -> &'a str {
         unsafe { std::str::from_utf8_unchecked(self.to_bytes()) }
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<*mut zend_string> for &mut ZStr {
     fn into(self) -> *mut zend_string {
         &mut self.inner
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<*const zend_string> for &mut ZStr {
     fn into(self) -> *const zend_string {
         &mut self.inner
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<*const c_char> for &ZStr {
     fn into(self) -> *const c_char {
         self.as_c_str_ptr()
@@ -244,8 +252,8 @@ impl ZString {
     }
 }
 
-unsafe impl<'a> IntoStr<'a> for ZString {
-    fn into_str(&'a self) -> &'a str {
+unsafe impl<'a> ToStr<'a> for ZString {
+    fn to_unsafe_str(&'a self) -> &'a str {
         unsafe { std::str::from_utf8_unchecked(self.to_bytes()) }
     }
 }

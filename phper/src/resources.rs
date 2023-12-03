@@ -22,6 +22,8 @@ pub struct ZRes<T> {
     _data: PhantomData<T>,
 }
 
+/// Zend Persistent Resource
+/// Usecase: Database Persistent Connections, HTTP Connections etc
 #[repr(transparent)]
 pub struct ZPersistentResource<T> {
     inner: *const zend_resource,
