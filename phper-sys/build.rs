@@ -45,6 +45,19 @@ fn main() {
         // Block the `zend_ini_parse_quantity` because it's document causes the doc test to fail.
         .blocklist_function("zend_ini_parse_quantity")
         .clang_args(&includes)
+        .clang_args(&[
+            "-falign-functions",
+            "-flto=auto",
+            "-std=c17",
+            "-pedantic",
+            "-Wextra",
+        ])
+        .derive_hash(true)
+        .derive_copy(true)
+        .derive_eq(true)
+        .derive_ord(true)
+        .derive_partialeq(true)
+        .derive_partialord(true)
         .derive_default(true);
 
     // iterate over the php include directories, and update the builder

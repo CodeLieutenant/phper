@@ -17,12 +17,8 @@
 #include <main/SAPI.h>
 #include <zend_exceptions.h>
 #include <zend_interfaces.h>
-
-#include <zend_smart_str.h>
-
-#if PHP_MAJOR_VERSION >= 8
 #include <zend_observer.h>
-#endif
+#include <zend_smart_str.h>
 
 typedef ZEND_INI_MH(phper_zend_ini_mh);
 
@@ -275,7 +271,7 @@ ZEND_FASTCALL void phper_smart_str_0(smart_str *str) {
 }
 
 ZEND_FASTCALL size_t phper_smart_str_get_len(const smart_str *str) {
-    return smart_str_get_len(str);
+    return smart_str_get_len((smart_str *)str);
 }
 
 ZEND_FASTCALL zend_string *phper_smart_str_extract(smart_str *str) {
@@ -556,7 +552,8 @@ ZEND_FASTCALL zend_internal_arg_info phper_zend_arg_info(bool pass_by_ref,
 ZEND_FASTCALL zend_resource *
 phper_register_persistent_resource(const zend_string *id, const void *ptr,
                                    int le_id) {
-    return zend_register_persistent_resource_ex(id, ptr, le_id);
+    return zend_register_persistent_resource_ex((zend_string *)id, (void *)ptr,
+                                                le_id);
 }
 
 ZEND_FASTCALL int phper_zend_register_persistent_list_destructors(
