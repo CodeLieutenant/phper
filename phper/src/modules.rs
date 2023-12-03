@@ -33,7 +33,7 @@ use std::{
 
 /// Global pointer hold the Module builder.
 /// Because PHP is single threaded, so there is no lock here.
-static mut GLOBAL_MODULE: *mut Module = null_mut();
+static mut GLOBAL_MODULE: Option<Box<Module>> = None;
 pub(crate) static mut GLOBAL_MODULE_NUMBER: i32 = 0;
 
 static mut GLOBAL_MODULE_ENTRY: *mut zend_module_entry = null_mut();
@@ -51,7 +51,7 @@ unsafe extern "C" fn module_startup(_type: c_int, module_number: c_int) -> c_int
     let module = GLOBAL_MODULE.as_mut().unwrap();
     GLOBAL_MODULE_NUMBER = module_number;
 
-    ini::register(&module.ini_entities, module_number);
+    ini::register(take(&mut module.ini_entities), module_number);
 
     for constant in &module.constants {
         constant.register(module_number);
@@ -77,16 +77,20 @@ unsafe extern "C" fn module_startup(_type: c_int, module_number: c_int) -> c_int
 }
 
 unsafe extern "C" fn module_shutdown(_type: c_int, module_number: c_int) -> c_int {
-    let module = GLOBAL_MODULE.as_mut().unwrap();
+    {
+        let module = GLOBAL_MODULE.as_mut().unwrap();
 
-    ini::unregister(module_number);
+        ini::unregister(module_number);
 
-    if let Some(f) = take(&mut module.module_shutdown) {
-        f(ModuleInfo {
-            ty: _type,
-            number: module_number,
-        });
+        if let Some(f) = take(&mut module.module_shutdown) {
+            f(ModuleInfo {
+                ty: _type,
+                number: module_number,
+            });
+        }
     }
+
+    // std::mem::replace(GLOBAL_MODULE.as_mut().unwrap(), null_mut());
 
     ZEND_RESULT_CODE_SUCCESS
 }
@@ -149,16 +153,14 @@ pub struct Module {
     class_entities: Vec<ClassEntity<()>>,
     interface_entities: Vec<InterfaceEntity>,
     constants: Vec<Constant>,
-    ini_entities: Vec<ini::IniEntity>,
+    ini_entities: Vec<zend_ini_entry_def>,
     infos: HashMap<CString, CString>,
 }
 
 impl Module {
     /// Construct the `Module` with base metadata.
     pub fn new(
-        name: impl Into<String>,
-        version: impl Into<String>,
-        author: impl Into<String>,
+        name: impl Into<String>, version: impl Into<String>, author: impl Into<String>,
     ) -> Self {
         Self {
             name: ensure_end_with_zero(name),
@@ -199,9 +201,7 @@ impl Module {
 
     /// Register function to module.
     pub fn add_function<F, Z, E>(
-        &mut self,
-        name: impl Into<String>,
-        handler: F,
+        &mut self, name: impl Into<String>, handler: F,
     ) -> &mut FunctionEntity
     where
         F: Fn(&mut [ZVal]) -> Result<Z, E> + 'static,
@@ -230,13 +230,16 @@ impl Module {
 
     /// Register ini configuration to module.
     pub fn add_ini(
-        &mut self,
-        name: impl Into<String>,
-        default_value: impl ini::IntoIniValue,
+        &mut self, name: impl AsRef<str>, default_value: impl ini::IntoIniValue,
         policy: ini::Policy,
     ) {
-        self.ini_entities
-            .push(ini::IniEntity::new(name, default_value, policy));
+        let ini = ini::create_ini_entry_ex(
+            name.as_ref(),
+            default_value.into_ini_value(),
+            policy as u32,
+            Option::<()>::None,
+        );
+        self.ini_entities.push(ini);
     }
 
     /// Register info item.
@@ -250,7 +253,6 @@ impl Module {
         self.infos.insert(key, value);
     }
 
-    /// Leak memory to generate `zend_module_entry` pointer.
     #[doc(hidden)]
     pub unsafe fn module_entry(self) -> *const zend_module_entry {
         if !GLOBAL_MODULE_ENTRY.is_null() {
@@ -263,9 +265,9 @@ impl Module {
             "module version must be set"
         );
 
-        let module = Box::new(self);
+        let module: Box<Module> = Box::new(self);
 
-        let entry: Box<zend_module_entry> = Box::new(zend_module_entry {
+        let entry = Box::new(zend_module_entry {
             size: size_of::<zend_module_entry>() as c_ushort,
             zend_api: ZEND_MODULE_API_NO as c_uint,
             zend_debug: ZEND_DEBUG as c_uchar,
@@ -295,7 +297,7 @@ impl Module {
             build_id: phper_get_zend_module_build_id(),
         });
 
-        GLOBAL_MODULE = Box::into_raw(module);
+        GLOBAL_MODULE = Some(module);
         GLOBAL_MODULE_ENTRY = Box::into_raw(entry);
 
         GLOBAL_MODULE_ENTRY

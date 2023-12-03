@@ -10,7 +10,9 @@
 
 //! Apis relate to [zend_ini_entry_def].
 
+use crate::strings::ZString;
 use crate::{c_str, sys::*};
+use std::ffi::{c_uchar, c_void};
 use std::{
     ffi::{c_int, CStr},
     mem::zeroed,
@@ -18,6 +20,8 @@ use std::{
     ptr::null_mut,
     str,
 };
+
+use phper_sys::*;
 
 /// Get the global registered configuration value.
 ///
@@ -49,10 +53,61 @@ pub enum Policy {
     System = PHP_INI_SYSTEM,
 }
 
+/// Configuration for INI Display Options.
+#[repr(u32)]
+#[derive(Copy, Clone)]
+pub enum Display {
+    Original = ZEND_INI_DISPLAY_ORIG,
+    Active = ZEND_INI_DISPLAY_ACTIVE,
+}
+
+/// Configuration for INI Stage.
+#[repr(i32)]
+#[derive(Copy, Clone)]
+pub enum Stage {
+    Startup = ZEND_INI_STAGE_STARTUP as i32,
+    Shutdown = ZEND_INI_STAGE_SHUTDOWN as i32,
+    Activate = ZEND_INI_STAGE_ACTIVATE as i32,
+    Deactivate = ZEND_INI_STAGE_DEACTIVATE as i32,
+    Runtime = ZEND_INI_STAGE_RUNTIME as i32,
+    Htacces = ZEND_INI_STAGE_HTACCESS as i32,
+}
+
 /// The Type which can transform to an ini value.
 pub trait IntoIniValue {
     /// transform to an ini value.
     fn into_ini_value(self) -> String;
+}
+
+enum PHPIniFunction<T> {
+    Exists(unsafe extern "C" fn(*const c_char, usize, c_int, *mut bool) -> T),
+
+    DefaultValue(unsafe extern "C" fn(*const c_char, usize, c_int) -> T),
+}
+
+impl TryFrom<i32> for Stage {
+    type Error = Box<dyn std::error::Error>;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        let (startup, shutdown, activate, deactivate, runtime, htaccess) = (
+            ZEND_INI_STAGE_STARTUP as i32,
+            ZEND_INI_STAGE_SHUTDOWN as i32,
+            ZEND_INI_STAGE_ACTIVATE as i32,
+            ZEND_INI_STAGE_DEACTIVATE as i32,
+            ZEND_INI_STAGE_RUNTIME as i32,
+            ZEND_INI_STAGE_HTACCESS as i32,
+        );
+
+        match value {
+            startup => Ok(Stage::Startup),
+            shutdown => Ok(Stage::Shutdown),
+            activate => Ok(Stage::Activate),
+            deactivate => Ok(Self::Deactivate),
+            runtime => Ok(Stage::Runtime),
+            htaccess => Ok(Stage::Htacces),
+            _ => Err("Invalid Zend Stage for INI values".into()),
+        }
+    }
 }
 
 impl IntoIniValue for bool {
@@ -97,7 +152,6 @@ pub trait FromIniValue {
 }
 
 impl FromIniValue for bool {
-    #[allow(clippy::useless_conversion)]
     fn from_ini_value(name: &str) -> Self {
         let s = <Option<&CStr>>::from_ini_value(name);
         [
@@ -111,107 +165,169 @@ impl FromIniValue for bool {
 }
 
 impl FromIniValue for i64 {
-    #[allow(clippy::useless_conversion)]
     fn from_ini_value(name: &str) -> Self {
-        unsafe {
-            let name_ptr = name.as_ptr() as *mut u8 as *mut c_char;
-            zend_ini_long(name_ptr, name.len().try_into().unwrap(), 0)
-        }
+        extract_ini_value(name, PHPIniFunction::DefaultValue(zend_ini_long)).unwrap_or_default()
     }
 }
 
 impl FromIniValue for f64 {
-    #[allow(clippy::useless_conversion)]
     fn from_ini_value(name: &str) -> Self {
         unsafe {
-            let name_ptr = name.as_ptr() as *mut u8 as *mut c_char;
-            zend_ini_double(name_ptr, name.len().try_into().unwrap(), 0)
+            let name_ptr = name.as_ptr() as *mut c_char;
+            zend_ini_double(name_ptr, name.len(), 0)
         }
     }
 }
 
 impl FromIniValue for Option<&CStr> {
-    #[allow(clippy::useless_conversion)]
     fn from_ini_value(name: &str) -> Self {
-        unsafe {
-            let name_ptr = name.as_ptr() as *mut u8 as *mut c_char;
-            let ptr = zend_ini_string_ex(name_ptr, name.len().try_into().unwrap(), 0, null_mut());
-            (!ptr.is_null()).then(|| CStr::from_ptr(ptr))
+        let ptr = extract_ini_value(name, PHPIniFunction::Exists(zend_ini_string_ex));
+        ptr.map(|ptr| unsafe { CStr::from_ptr(ptr) })
+    }
+}
+
+fn extract_ini_value<T>(name: &str, func: PHPIniFunction<T>) -> Option<T> {
+    let name_ptr = name.as_ptr() as *const c_char;
+
+    match func {
+        PHPIniFunction::Exists(f) => {
+            let mut exists = false;
+            let ptr = unsafe { f(name_ptr, name.len(), 0, &mut exists as *mut bool) };
+
+            if exists {
+                Some(ptr)
+            } else {
+                None
+            }
         }
+        PHPIniFunction::DefaultValue(f) => Some(unsafe { f(name_ptr, name.len(), 0) }),
     }
 }
 
-pub(crate) struct IniEntity {
-    name: String,
-    default_value: String,
-    policy: Policy,
-}
+impl FromIniValue for Option<String> {
+    fn from_ini_value(name: &str) -> Self {
+        let ptr = extract_ini_value(name, PHPIniFunction::Exists(zend_ini_string_ex));
 
-impl IniEntity {
-    pub(crate) fn new<T: IntoIniValue>(
-        name: impl Into<String>, default_value: T, policy: Policy,
-    ) -> Self {
-        Self {
-            name: name.into(),
-            default_value: default_value.into_ini_value(),
-            policy,
-        }
-    }
-
-    #[inline]
-    pub(crate) fn entry(&self) -> zend_ini_entry_def {
-        create_ini_entry_ex(&self.name, &self.default_value, self.policy as u32)
+        ptr.map(|ptr| unsafe { CStr::from_ptr(ptr) }.to_string_lossy().to_string())
     }
 }
 
-fn create_ini_entry_ex(name: &str, default_value: &str, modifiable: u32) -> zend_ini_entry_def {
-    #[cfg(any(
-        phper_major_version = "8",
-        all(
-            phper_major_version = "7",
-            any(phper_minor_version = "4", phper_minor_version = "3")
-        )
-    ))]
-    let (modifiable, name_length) = (modifiable as std::os::raw::c_uchar, name.len() as u16);
+impl FromIniValue for String {
+    fn from_ini_value(name: &str) -> Self {
+        let ptr = extract_ini_value(name, PHPIniFunction::Exists(zend_ini_string_ex));
 
-    #[cfg(all(
-        phper_major_version = "7",
-        any(
-            phper_minor_version = "2",
-            phper_minor_version = "1",
-            phper_minor_version = "0",
-        )
-    ))]
-    let (modifiable, name_length) = (modifiable as std::os::raw::c_int, name.len() as u32);
+        ptr.map(|ptr| unsafe { CStr::from_ptr(ptr) }.to_string_lossy().to_string())
+            .unwrap_or_default()
+    }
+}
+
+impl FromIniValue for Option<&str> {
+    fn from_ini_value(name: &str) -> Self {
+        let ptr = extract_ini_value(name, PHPIniFunction::Exists(zend_ini_string_ex));
+        ptr.map(|ptr| unsafe { CStr::from_ptr(ptr) }.to_str().unwrap()) // Totally OK to crash here
+    }
+}
+
+impl FromIniValue for &str {
+    fn from_ini_value(name: &str) -> Self {
+        let ptr = extract_ini_value(name, PHPIniFunction::Exists(zend_ini_string_ex));
+        ptr.map(|ptr| unsafe { CStr::from_ptr(ptr) }.to_str().unwrap())
+            .unwrap_or_default() // Totally OK to crash here
+    }
+}
+
+unsafe extern "C" fn on_modify<T: OnModify>(
+    entry: *mut _zend_ini_entry, new_value: *mut _zend_string, arg1: *mut c_void,
+    _arg2: *mut c_void, _arg3: *mut c_void, stage: i32,
+) -> i32 {
+    let stage = match Stage::try_from(stage) {
+        Ok(val) => val,
+        Err(_) => return ZEND_RESULT_CODE_FAILURE,
+    };
+
+    let on_modify_item = &mut *(arg1 as *mut OnModifyCarry<T>);
+
+    let modify = &mut on_modify_item.on_modify;
+
+    modify
+        .on_modify(ZString::from_raw(new_value), stage)
+        .map(|_| ZEND_RESULT_CODE_SUCCESS)
+        .map_err(|_| ZEND_RESULT_CODE_FAILURE)
+        .unwrap()
+}
+
+pub trait OnModify {
+    fn on_modify(
+        &mut self, new_value: ZString, stage: Stage,
+    ) -> Result<(), Box<dyn std::error::Error>>;
+}
+
+impl OnModify for () {
+    fn on_modify(
+        &mut self, new_value: ZString, stage: Stage,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
+    }
+}
+
+struct OnModifyCarry<T>
+where
+    T: OnModify,
+{
+    on_modify: T,
+}
+
+type ZendOnModify = unsafe extern "C" fn(
+    entry: *mut zend_ini_entry,
+    new_value: *mut zend_string,
+    mh_arg1: *mut c_void,
+    mh_arg2: *mut c_void,
+    mh_arg3: *mut c_void,
+    stage: c_int,
+) -> c_int;
+
+pub(crate) fn create_ini_entry_ex<T>(
+    name: impl AsRef<str>, default_value: impl AsRef<str>, modifiable: u32,
+    on_modify_impl: Option<T>,
+) -> zend_ini_entry_def
+where
+    T: OnModify,
+{
+    let name = name.as_ref();
+    let default_value = default_value.as_ref();
+    let (modifiable, name_length) = (modifiable as c_uchar, name.len() as u16);
+
+    let (callback, arg): (Option<ZendOnModify>, *mut OnModifyCarry<T>) = match on_modify_impl {
+        Some(callback) => (
+            Some(on_modify::<T> as ZendOnModify),
+            Box::into_raw(Box::new(OnModifyCarry {
+                on_modify: callback,
+            })),
+        ),
+        None => (None, null_mut()),
+    };
 
     zend_ini_entry_def {
         name: name.as_ptr().cast(),
-        on_modify: None,
-        mh_arg1: null_mut(),
+        name_length,
+        on_modify: callback,
+        mh_arg1: arg as *mut c_void,
         mh_arg2: null_mut(),
         mh_arg3: null_mut(),
         value: default_value.as_ptr().cast(),
+        value_length: default_value.len() as u32,
         displayer: None,
         modifiable,
-        name_length,
-        value_length: default_value.len() as u32,
     }
 }
 
-unsafe fn entries(ini_entries: &[IniEntity]) -> *const zend_ini_entry_def {
-    let mut entries = Vec::with_capacity(ini_entries.len() + 1);
+unsafe fn entries(mut ini_entries: Vec<zend_ini_entry_def>) -> *const zend_ini_entry_def {
+    ini_entries.push(zeroed::<zend_ini_entry_def>());
 
-    ini_entries.iter().for_each(|entity| {
-        // Ini entity will exist throughout the whole application life cycle.
-        entries.push(entity.entry());
-    });
-
-    entries.push(zeroed::<zend_ini_entry_def>());
-
-    Box::into_raw(entries.into_boxed_slice()).cast()
+    Box::into_raw(ini_entries.into_boxed_slice()).cast()
 }
 
-pub(crate) fn register(ini_entries: &[IniEntity], module_number: c_int) {
+pub(crate) fn register(ini_entries: Vec<zend_ini_entry_def>, module_number: c_int) {
     unsafe {
         zend_register_ini_entries(entries(ini_entries), module_number);
     }

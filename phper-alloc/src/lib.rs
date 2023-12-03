@@ -18,7 +18,6 @@ mod macros;
 use phper_sys::*;
 use std::{
     borrow::Borrow,
-    convert::TryInto,
     mem::{size_of, ManuallyDrop},
     ops::{Deref, DerefMut},
 };
@@ -37,11 +36,10 @@ impl<T> EBox<T> {
     /// # Panic
     ///
     /// Panic if `size_of::<T>()` equals zero.
-    #[allow(clippy::useless_conversion)]
     pub fn new(x: T) -> Self {
         unsafe {
             assert_ne!(size_of::<T>(), 0);
-            let ptr: *mut T = phper_emalloc(size_of::<T>().try_into().unwrap()).cast();
+            let ptr: *mut T = phper_emalloc(size_of::<T>()).cast();
             // TODO Deal with ptr is zero, when memory limit is reached.
             ptr.write(x);
             Self { ptr }

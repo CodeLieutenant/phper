@@ -25,6 +25,7 @@ use std::{
     slice::from_raw_parts,
 };
 
+/// Unsafe implementation for &'a str conversion from T
 pub unsafe trait IntoStr<'a> {
     fn into_str(&'a self) -> &'a str;
 }
