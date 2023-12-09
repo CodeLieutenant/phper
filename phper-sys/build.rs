@@ -12,7 +12,8 @@ use bindgen::Builder;
 use std::{env, ffi::OsStr, fmt::Debug, path::PathBuf, process::Command};
 
 fn main() {
-    println!("cargo:rerun-if-changed=php_wrapper.c");
+    println!("cargo:rerun-if-changed=c/php_wrapper.c");
+    println!("cargo:rerun-if-changed=c/php_args.c");
     println!("cargo:rerun-if-env-changed=PHP_CONFIG");
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -27,7 +28,10 @@ fn main() {
     for include in &includes {
         builder.flag(include);
     }
-    builder.file("php_wrapper.c").compile("phpwrapper");
+    builder
+        .file("c/php_wrapper.c")
+        .file("c/php_args.c")
+        .compile("phpwrapper");
 
     // Generate bindgen file.
     let include_dirs = includes

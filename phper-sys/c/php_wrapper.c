@@ -531,24 +531,6 @@ ZEND_FASTCALL const char *phper_get_zend_module_build_id() {
     return ZEND_MODULE_BUILD_ID;
 }
 
-ZEND_FASTCALL zend_internal_arg_info phper_zend_begin_arg_info_ex(
-    bool return_reference, uintptr_t required_num_args) {
-#define static
-#define const
-    ZEND_BEGIN_ARG_INFO_EX(info, 0, return_reference, required_num_args)
-    ZEND_END_ARG_INFO()
-    return info[0];
-#undef static
-#undef const
-}
-
-ZEND_FASTCALL zend_internal_arg_info phper_zend_arg_info(bool pass_by_ref,
-                                                         const char *name) {
-    zend_internal_arg_info info[] = {ZEND_ARG_INFO(pass_by_ref, )};
-    info[0].name = name;
-    return info[0];
-}
-
 ZEND_FASTCALL zend_resource *
 phper_register_persistent_resource(const zend_string *id, const void *ptr,
                                    int le_id) {
