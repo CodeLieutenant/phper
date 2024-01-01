@@ -18,7 +18,7 @@ use axum::{
 use hyper::body;
 use phper::{
     alloc::ToRefOwned,
-    classes::{ClassEntity, Visibility},
+    classes::{entity::ClassEntity, Visibility},
     functions::Argument,
     values::ZVal,
 };

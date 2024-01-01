@@ -14,7 +14,7 @@ use axum::{
     http::{HeaderName, HeaderValue, Response},
 };
 use phper::{
-    classes::{ClassEntity, StaticStateClass, Visibility},
+    classes::{entity::ClassEntity, StaticStateClass, Visibility},
     functions::Argument,
     objects::StateObject,
 };

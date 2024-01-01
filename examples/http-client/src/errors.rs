@@ -9,7 +9,7 @@
 // See the Mulan PSL v2 for more details.
 
 use phper::{
-    classes::{ClassEntity, ClassEntry},
+    classes::{entity::ClassEntity, entry::ClassEntry},
     errors::{exception_class, Throwable},
 };
 

@@ -11,7 +11,7 @@
 //! Apis relate to [zend_object].
 
 use crate::{
-    classes::ClassEntry,
+    classes::entry::ClassEntry,
     functions::{call_internal, call_raw_common, ZFunc},
     sys::*,
     values::ZVal,

@@ -12,7 +12,7 @@
 
 use crate::{
     c_str_ptr,
-    classes::{ClassEntity, InterfaceEntity},
+    classes::{entity::ClassEntity, InterfaceEntity},
     constants::Constant,
     errors::Throwable,
     functions::{Function, FunctionEntity, FunctionEntry},

@@ -9,7 +9,7 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::{errors::HttpClientError, response::RESPONSE_CLASS};
-use phper::classes::{ClassEntity, StaticStateClass, Visibility};
+use phper::classes::{entity::ClassEntity, StaticStateClass, Visibility};
 use reqwest::blocking::RequestBuilder;
 use std::{convert::Infallible, mem::take};
 

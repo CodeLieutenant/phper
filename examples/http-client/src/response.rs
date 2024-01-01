@@ -11,7 +11,7 @@
 use crate::errors::HttpClientError;
 use phper::{
     arrays::{InsertKey, ZArray},
-    classes::{ClassEntity, StaticStateClass, Visibility},
+    classes::{entity::ClassEntity, StaticStateClass, Visibility},
     values::ZVal,
 };
 use reqwest::blocking::Response;

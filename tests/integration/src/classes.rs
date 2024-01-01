@@ -11,8 +11,10 @@
 use phper::{
     alloc::RefClone,
     classes::{
-        array_access_class, iterator_class, ClassEntity, ClassEntry, InterfaceEntity,
-        StaticInterface, StaticStateClass, Visibility,
+        entity::ClassEntity,
+        entry::ClassEntry,
+        zend_classes::{array_access_interface, iterator_interface},
+        InterfaceEntity, StaticInterface, StaticStateClass, Visibility,
     },
     functions::Argument,
     modules::Module,
@@ -72,8 +74,8 @@ fn integrate_foo(module: &mut Module) {
 
     class.bind(&FOO_CLASS);
 
-    class.implements(iterator_class);
-    class.implements(array_access_class);
+    class.implements(iterator_interface);
+    class.implements(array_access_interface);
 
     // Implement Iterator interface.
     class.add_method("current", Visibility::Public, |this, _arguments| {
@@ -146,8 +148,8 @@ fn integrate_i_bar(module: &mut Module) {
 
     interface.bind(&I_BAR_INTERFACE);
 
-    interface.extends(|| array_access_class());
-    interface.extends(|| iterator_class());
+    interface.extends(|| array_access_interface());
+    interface.extends(|| iterator_interface());
 
     interface
         .add_method("doSomethings")

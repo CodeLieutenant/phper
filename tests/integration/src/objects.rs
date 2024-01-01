@@ -10,7 +10,7 @@
 
 use phper::{
     alloc::{RefClone, ToRefOwned},
-    classes::{ClassEntity, ClassEntry, Visibility},
+    classes::{entity::ClassEntity, entry::ClassEntry, Visibility},
     functions::Argument,
     modules::Module,
     objects::ZObject,

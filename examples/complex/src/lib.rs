@@ -10,7 +10,7 @@
 
 use phper::{
     arrays::ZArray,
-    classes::{ClassEntity, Visibility},
+    classes::{entity::ClassEntity, Visibility},
     functions::Argument,
     ini::{ini_get, Policy},
     modules::Module,

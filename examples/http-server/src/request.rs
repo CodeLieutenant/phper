@@ -10,7 +10,7 @@
 
 use phper::{
     arrays::ZArray,
-    classes::{ClassEntity, StaticStateClass, Visibility},
+    classes::{entity::ClassEntity, StaticStateClass, Visibility},
     objects::StateObject,
 };
 use std::convert::Infallible;

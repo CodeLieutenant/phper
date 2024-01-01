@@ -13,6 +13,7 @@ use std::{env, ffi::OsStr, fmt::Debug, path::PathBuf, process::Command};
 
 fn main() {
     println!("cargo:rerun-if-env-changed=PHP_CONFIG");
+    println!("cargo:rerun-if-changed=build.rs");
     let current_dir = std::env::current_dir().unwrap();
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
@@ -41,9 +42,9 @@ fn main() {
 
     builder
         .cpp(false)
-        // .debug(false)
+        .debug(false)
         .files(&c_files)
-        // .extra_warnings(true)
+        .extra_warnings(true)
         .include("include")
         // .flag("-falign-functions")
         // .flag("-flto=auto")

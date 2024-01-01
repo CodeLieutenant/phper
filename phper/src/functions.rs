@@ -14,7 +14,7 @@
 
 use crate::{
     cg,
-    classes::{ClassEntry, RawVisibility, Visibility},
+    classes::{entry::ClassEntry, RawVisibility, Visibility},
     errors::{throw, ArgumentCountError, ExceptionGuard, ThrowObject, Throwable},
     objects::{StateObj, ZObj, ZObject},
     strings::{ZStr, ZString},
