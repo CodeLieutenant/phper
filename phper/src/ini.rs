@@ -261,8 +261,12 @@ impl From<&_zend_ini_entry> for Entry {
 }
 
 unsafe extern "C" fn on_modify<T: OnModify>(
-    entry: *mut _zend_ini_entry, new_value: *mut _zend_string, arg1: *mut c_void,
-    _arg2: *mut c_void, _arg3: *mut c_void, stage: i32,
+    entry: *mut _zend_ini_entry,
+    new_value: *mut _zend_string,
+    arg1: *mut c_void,
+    _arg2: *mut c_void,
+    _arg3: *mut c_void,
+    stage: i32,
 ) -> i32 {
     let stage = match Stage::try_from(stage) {
         Ok(val) => val,
@@ -295,13 +299,19 @@ unsafe extern "C" fn on_modify<T: OnModify>(
 pub trait OnModify {
     /// Called whenever INI has chaged
     fn on_modify(
-        &mut self, entry: Entry, new_value: ZString, stage: Stage,
+        &mut self,
+        entry: Entry,
+        new_value: ZString,
+        stage: Stage,
     ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 impl OnModify for () {
     fn on_modify(
-        &mut self, _entry: Entry, _new_value: ZString, _stage: Stage,
+        &mut self,
+        _entry: Entry,
+        _new_value: ZString,
+        _stage: Stage,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
@@ -324,7 +334,9 @@ type ZendOnModify = unsafe extern "C" fn(
 ) -> c_int;
 
 pub(crate) fn create_ini_entry_ex<T>(
-    name: impl AsRef<str>, default_value: impl AsRef<str>, modifiable: u32,
+    name: impl AsRef<str>,
+    default_value: impl AsRef<str>,
+    modifiable: u32,
     on_modify_impl: Option<T>,
 ) -> zend_ini_entry_def
 where

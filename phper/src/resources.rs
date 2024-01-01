@@ -142,7 +142,10 @@ impl<T> ZPersistentResource<T> {
 
     /// Creates new Zend Persistent Resource with Cleanup function
     pub fn new_with_cleanup<Fn: FnOnce(&mut T)>(
-        hash: impl Into<crate::strings::ZString>, name: &'static str, value: T, cleanup: Option<Fn>,
+        hash: impl Into<crate::strings::ZString>,
+        name: &'static str,
+        value: T,
+        cleanup: Option<Fn>,
     ) -> Self {
         let resource = unsafe {
             let id: i32 = phper_zend_register_persistent_list_destructors(

@@ -65,7 +65,8 @@ impl<T: 'static> ClassEntity<T> {
     /// Construct a new `ClassEntity` with class name and the constructor to
     /// build state.
     pub fn new_with_state_constructor(
-        class_name: impl Into<String>, state_constructor: impl Fn() -> T + 'static,
+        class_name: impl Into<String>,
+        state_constructor: impl Fn() -> T + 'static,
     ) -> Self {
         Self {
             class_name: crate::utils::ensure_end_with_zero(class_name),
@@ -86,7 +87,10 @@ impl<T: 'static> ClassEntity<T> {
 
     /// Add member method to class, with visibility and method handler.
     pub fn add_method<F, Z, E>(
-        &mut self, name: impl Into<String>, vis: Visibility, handler: F,
+        &mut self,
+        name: impl Into<String>,
+        vis: Visibility,
+        handler: F,
     ) -> &mut MethodEntity
     where
         F: Fn(&mut StateObj<T>, &mut [ZVal]) -> Result<Z, E> + 'static,
@@ -103,7 +107,10 @@ impl<T: 'static> ClassEntity<T> {
 
     /// Add static method to class, with visibility and method handler.
     pub fn add_static_method<F, Z, E>(
-        &mut self, name: impl Into<String>, vis: Visibility, handler: F,
+        &mut self,
+        name: impl Into<String>,
+        vis: Visibility,
+        handler: F,
     ) -> &mut MethodEntity
     where
         F: Fn(&mut [ZVal]) -> Result<Z, E> + 'static,
@@ -118,7 +125,9 @@ impl<T: 'static> ClassEntity<T> {
 
     /// Add abstract method to class, with visibility (shouldn't be private).
     pub fn add_abstract_method(
-        &mut self, name: impl Into<String>, vis: Visibility,
+        &mut self,
+        name: impl Into<String>,
+        vis: Visibility,
     ) -> &mut MethodEntity {
         let mut entity = MethodEntity::new(name, None, vis);
         entity.set_vis_abstract();
@@ -132,7 +141,10 @@ impl<T: 'static> ClassEntity<T> {
     /// receive only scalar zval , otherwise will report fatal error:
     /// "Internal zvals cannot be refcounted".
     pub fn add_property(
-        &mut self, name: impl Into<String>, visibility: Visibility, value: impl Into<Scalar>,
+        &mut self,
+        name: impl Into<String>,
+        visibility: Visibility,
+        value: impl Into<Scalar>,
     ) {
         self.property_entities
             .push(PropertyEntity::new(name, visibility, value));
@@ -144,7 +156,10 @@ impl<T: 'static> ClassEntity<T> {
     /// receive only scalar zval , otherwise will report fatal error:
     /// "Internal zvals cannot be refcounted".
     pub fn add_static_property(
-        &mut self, name: impl Into<String>, visibility: Visibility, value: impl Into<Scalar>,
+        &mut self,
+        name: impl Into<String>,
+        visibility: Visibility,
+        value: impl Into<Scalar>,
     ) {
         let mut entity = PropertyEntity::new(name, visibility, value);
         entity.set_vis_static();

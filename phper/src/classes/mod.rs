@@ -108,7 +108,8 @@ impl<T> StaticStateClass<T> {
     /// If the `__construct` is private, or protected and the called scope isn't
     /// parent class, it will throw PHP Error.
     pub fn new_object(
-        &'static self, arguments: impl AsMut<[ZVal]>,
+        &'static self,
+        arguments: impl AsMut<[ZVal]>,
     ) -> crate::Result<StateObject<T>> {
         self.as_class_entry()
             .new_object(arguments)
@@ -181,7 +182,8 @@ pub(crate) type StateConstructor = dyn Fn() -> *mut dyn Any;
 pub(crate) type StateCloner = dyn Fn(*const dyn Any) -> *mut dyn Any;
 
 unsafe extern "C" fn class_init_handler(
-    class_ce: *mut zend_class_entry, argument: *mut c_void,
+    class_ce: *mut zend_class_entry,
+    argument: *mut c_void,
 ) -> *mut zend_class_entry {
     let parent = argument as *mut zend_class_entry;
     if parent.is_null() {
@@ -283,7 +285,8 @@ impl InterfaceEntity {
 }
 
 unsafe extern "C" fn interface_init_handler(
-    class_ce: *mut zend_class_entry, _argument: *mut c_void,
+    class_ce: *mut zend_class_entry,
+    _argument: *mut c_void,
 ) -> *mut zend_class_entry {
     zend_register_internal_interface(class_ce)
 }

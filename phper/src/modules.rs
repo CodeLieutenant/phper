@@ -160,7 +160,9 @@ pub struct Module {
 impl Module {
     /// Construct the `Module` with base metadata.
     pub fn new(
-        name: impl Into<String>, version: impl Into<String>, author: impl Into<String>,
+        name: impl Into<String>,
+        version: impl Into<String>,
+        author: impl Into<String>,
     ) -> Self {
         Self {
             name: ensure_end_with_zero(name),
@@ -201,7 +203,9 @@ impl Module {
 
     /// Register function to module.
     pub fn add_function<F, Z, E>(
-        &mut self, name: impl Into<String>, handler: F,
+        &mut self,
+        name: impl Into<String>,
+        handler: F,
     ) -> &mut FunctionEntity
     where
         F: Fn(&mut [ZVal]) -> Result<Z, E> + 'static,
@@ -230,7 +234,9 @@ impl Module {
 
     /// Register ini configuration to module.
     pub fn add_ini(
-        &mut self, name: impl AsRef<str>, default_value: impl ini::IntoIniValue,
+        &mut self,
+        name: impl AsRef<str>,
+        default_value: impl ini::IntoIniValue,
         policy: ini::Policy,
     ) {
         let ini = ini::create_ini_entry_ex(

@@ -49,7 +49,8 @@ pub type ScriptCondition<'a> = (&'a dyn AsRef<Path>, &'a dyn Fn(Output) -> bool)
 ///
 /// See [example logging integration test](https://github.com/phper-framework/phper/blob/master/examples/logging/tests/integration.rs).
 pub fn test_php_scripts_with_condition(
-    lib_path: impl AsRef<Path>, scripts: &[ScriptCondition<'_>],
+    lib_path: impl AsRef<Path>,
+    scripts: &[ScriptCondition<'_>],
 ) {
     let context = Context::get_global();
 
@@ -94,7 +95,8 @@ pub fn test_php_scripts_with_condition(
 /// Check your extension by executing the long term php script such as http
 /// server, if the all your specified checkers are pass, than the test is pass.
 pub fn test_long_term_php_script_with_condition(
-    lib_path: impl AsRef<Path>, script: impl AsRef<Path>,
+    lib_path: impl AsRef<Path>,
+    script: impl AsRef<Path>,
     condition: impl FnOnce(&Child) + UnwindSafe,
 ) {
     let context = Context::get_global();
