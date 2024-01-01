@@ -44,17 +44,13 @@ fn main() {
         .cpp(false)
         .debug(false)
         .files(&c_files)
-        .extra_warnings(true)
+        .extra_warnings(false)
+        .warnings(false)
         .include("include")
-        // .flag("-falign-functions")
-        // .flag("-flto=auto")
-        // .flag("-std=c2x") // Replace with -std=c23 after CLANG 18
-        // .flag("-pedantic")
-        // .flag("-Wno-ignored-qualifiers")
-        // .force_frame_pointer(false)
-        // .opt_level(3)
-        .warnings(true)
-        // .use_plt(false)
+        .flag("-std=c2x") // Replace with -std=c23 after CLANG 18
+        .force_frame_pointer(false)
+        .opt_level(3)
+        .use_plt(false)
         .static_flag(true)
         .pic(true)
         .compile("phpwrapper");
