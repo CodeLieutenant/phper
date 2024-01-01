@@ -661,18 +661,13 @@ impl From<bool> for ZVal {
     fn from(b: bool) -> Self {
         unsafe {
             let mut val = MaybeUninit::<ZVal>::uninit();
-            if b {
-                phper_zval_true(val.as_mut_ptr().cast());
-            } else {
-                phper_zval_false(val.as_mut_ptr().cast());
-            }
+            phper_zval_bool(val.as_mut_ptr().cast(), b);
             val.assume_init()
         }
     }
 }
 
 impl From<i64> for ZVal {
-    #[allow(clippy::useless_conversion)]
     fn from(i: i64) -> Self {
         unsafe {
             let mut val = MaybeUninit::<ZVal>::uninit();

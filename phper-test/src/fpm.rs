@@ -96,10 +96,7 @@ extern "C" fn teardown() {
 
 /// Start php-fpm and test the url request.
 pub fn test_fpm_request(
-    method: &str,
-    root: impl AsRef<Path>,
-    request_uri: &str,
-    content_type: Option<String>,
+    method: &str, root: impl AsRef<Path>, request_uri: &str, content_type: Option<String>,
     body: Option<Vec<u8>>,
 ) {
     assert!(FPM_HANDLE.get().is_some(), "must call `setup()` first");

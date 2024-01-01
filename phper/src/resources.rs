@@ -11,9 +11,11 @@
 //! Apis relate to [zend_resource].
 
 use crate::sys::*;
-use std::ffi::c_void;
-use std::fmt::{self, Debug};
-use std::marker::PhantomData;
+use std::{
+    ffi::c_void,
+    fmt::{self, Debug},
+    marker::PhantomData,
+};
 
 /// Wrapper of [zend_resource].
 #[repr(transparent)]
@@ -140,10 +142,7 @@ impl<T> ZPersistentResource<T> {
 
     /// Creates new Zend Persistent Resource with Cleanup function
     pub fn new_with_cleanup<Fn: FnOnce(&mut T)>(
-        hash: impl Into<crate::strings::ZString>,
-        name: &'static str,
-        value: T,
-        cleanup: Option<Fn>,
+        hash: impl Into<crate::strings::ZString>, name: &'static str, value: T, cleanup: Option<Fn>,
     ) -> Self {
         let resource = unsafe {
             let id: i32 = phper_zend_register_persistent_list_destructors(

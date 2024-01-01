@@ -12,7 +12,6 @@
 
 use crate::sys::*;
 use phper_alloc::ToRefOwned;
-use std::str::Utf8Error;
 use std::{
     borrow::Borrow,
     convert::TryInto,
@@ -23,12 +22,14 @@ use std::{
     ops::{Deref, DerefMut},
     os::raw::c_char,
     slice::from_raw_parts,
+    str::Utf8Error,
 };
 
 /// Unsafe implementation for &'a str conversion from T
 ///
 /// # Safety
-/// Coverting to str from ZString or ZStr when you are sure UTF-8 Is the only possible impl
+/// Coverting to str from ZString or ZStr when you are sure UTF-8 Is the only
+/// possible impl
 pub unsafe trait ToStr<'a> {
     /// Converts a Type to &str
     #[allow(clippy::wrong_self_convention)]

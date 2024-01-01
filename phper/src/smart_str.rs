@@ -1,11 +1,11 @@
 //! Apis relate to [zend_string](crate::sys::smart_str).
 
-use std::ffi::c_char;
-use std::fmt::Debug;
-use std::mem::MaybeUninit;
+use std::{ffi::c_char, fmt::Debug, mem::MaybeUninit};
 
-use crate::strings::{ZStr, ZString};
-use crate::sys::*;
+use crate::{
+    strings::{ZStr, ZString},
+    sys::*,
+};
 
 /// PHP String Builder for [zend_string](crate::sys::smart_str).
 #[repr(transparent)]
@@ -176,7 +176,7 @@ impl ZSmartStr {
         &mut self, str: impl Into<*const c_char>, len: usize,
     ) -> &mut Self {
         unsafe {
-            smart_str_append_escaped(&mut self.inner, str.into(), len);
+            phper_smart_str_append_escaped(&mut self.inner, str.into(), len);
         }
 
         self
@@ -188,7 +188,7 @@ impl ZSmartStr {
         &mut self, str: impl Into<*mut zend_string>, len: usize,
     ) -> &mut Self {
         unsafe {
-            smart_str_append_escaped_truncated(&mut self.inner, str.into(), len);
+            phper_smart_str_append_escaped_truncated(&mut self.inner, str.into(), len);
         }
 
         self
@@ -283,8 +283,9 @@ impl ZSmartStr {
         self
     }
 
-    /// Extracts the ZendString from the smart_str builder and drops the allocated memory.
-    /// Don't forget to call `append_null_byte` before build.
+    /// Extracts the ZendString from the smart_str builder and drops the
+    /// allocated memory. Don't forget to call `append_null_byte` before
+    /// build.
     #[inline]
     pub fn build(self) -> ZString {
         unsafe {

@@ -10,11 +10,9 @@
 
 //! Apis relate to [zend_ini_entry_def].
 
-use crate::c_str;
-use crate::strings::ZString;
-use std::ffi::{c_uchar, c_void};
+use crate::{c_str, strings::ZString};
 use std::{
-    ffi::{c_int, CStr},
+    ffi::{c_int, c_uchar, c_void, CStr},
     mem::zeroed,
     os::raw::c_char,
     ptr::null_mut,
@@ -84,7 +82,7 @@ enum PHPIniFunction<T> {
 }
 
 macro_rules! try_from_stage_int {
-    ($arg: ty) => {
+    ($arg:ty) => {
         impl TryFrom<$arg> for Stage {
             type Error = Box<dyn std::error::Error>;
 

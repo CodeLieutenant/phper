@@ -28,8 +28,7 @@ pub(crate) fn execute_command<S: AsRef<OsStr> + Debug>(argv: &[S]) -> String {
 }
 
 pub(crate) fn spawn_command<S: AsRef<OsStr> + Debug>(
-    argv: &[S],
-    wait_time: Option<std::time::Duration>,
+    argv: &[S], wait_time: Option<std::time::Duration>,
 ) -> std::process::Child {
     use std::{process::Stdio, thread};
 

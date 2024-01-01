@@ -141,7 +141,6 @@ impl ZArr {
     }
 
     /// Add or update item by key.
-    ///
     #[allow(clippy::useless_conversion)]
     pub fn insert<'a>(&mut self, key: impl Into<InsertKey<'a>>, value: impl Into<ZVal>) {
         let key = key.into();
@@ -185,13 +184,11 @@ impl ZArr {
     }
 
     /// Get item by key.
-    ///
     pub fn get<'a>(&self, key: impl Into<Key<'a>>) -> Option<&'a ZVal> {
         self.inner_get(key).map(|v| &*v)
     }
 
     /// Get item by key.
-    ///
     pub fn get_mut<'a>(&mut self, key: impl Into<Key<'a>>) -> Option<&'a mut ZVal> {
         self.inner_get(key)
     }
@@ -203,16 +200,12 @@ impl ZArr {
         unsafe {
             let value = match key {
                 Key::Index(i) => phper_zend_hash_index_find(ptr, i),
-                Key::Str(s) => phper_zend_str_find(
-                    ptr,
-                    s.as_ptr().cast(),
-                    s.len().try_into().unwrap(),
-                ),
-                Key::Bytes(b) => phper_zend_str_find(
-                    ptr,
-                    b.as_ptr().cast(),
-                    b.len().try_into().unwrap(),
-                ),
+                Key::Str(s) => {
+                    phper_zend_str_find(ptr, s.as_ptr().cast(), s.len().try_into().unwrap())
+                }
+                Key::Bytes(b) => {
+                    phper_zend_str_find(ptr, b.as_ptr().cast(), b.len().try_into().unwrap())
+                }
                 Key::ZStr(s) => {
                     phper_zend_str_find(ptr, s.as_c_str_ptr(), s.len().try_into().unwrap())
                 }
@@ -226,7 +219,6 @@ impl ZArr {
     }
 
     /// Check if the key exists.
-    ///
     #[allow(clippy::useless_conversion)]
     pub fn exists<'a>(&self, key: impl Into<Key<'a>>) -> bool {
         let key = key.into();
@@ -234,16 +226,12 @@ impl ZArr {
         unsafe {
             match key {
                 Key::Index(i) => phper_zend_hash_index_exists(ptr, i),
-                Key::Str(s) => phper_zend_str_exists(
-                    ptr,
-                    s.as_ptr().cast(),
-                    s.len().try_into().unwrap(),
-                ),
-                Key::Bytes(b) => phper_zend_str_exists(
-                    ptr,
-                    b.as_ptr().cast(),
-                    b.len().try_into().unwrap(),
-                ),
+                Key::Str(s) => {
+                    phper_zend_str_exists(ptr, s.as_ptr().cast(), s.len().try_into().unwrap())
+                }
+                Key::Bytes(b) => {
+                    phper_zend_str_exists(ptr, b.as_ptr().cast(), b.len().try_into().unwrap())
+                }
                 Key::ZStr(s) => phper_zend_str_exists(
                     ptr,
                     s.to_bytes().as_ptr().cast(),
@@ -254,7 +242,6 @@ impl ZArr {
     }
 
     /// Remove the item under the key
-    ///
     #[allow(clippy::useless_conversion)]
     pub fn remove<'a>(&mut self, key: impl Into<Key<'a>>) -> bool {
         let key = key.into();
