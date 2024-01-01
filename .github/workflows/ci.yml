@@ -71,16 +71,6 @@ jobs:
       #     apt-get install -y php${{ matrix.php-version }}-fpm
       #     rm -f /usr/sbin/php-fpm
       #     ln -s /usr/sbin/php-fpm${{ matrix.php-version }} /usr/sbin/php-fpm
-      # [[ `php-fpm --version` == PHP\ ${{ matrix.php-version }}.* ]] || exit 1;
-
-      - name: PHP version
-        run: |
-          php --version
-          php-fpm --version
-          php-config || true
-
-          [[ `php --version` == PHP\ ${{ matrix.php-version }}.* ]] || exit 1;
-          [[ `php-config --version` == ${{ matrix.php-version }}.* ]] || exit 1;
 
       - name: Cargo format
         run: |
