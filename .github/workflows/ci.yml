@@ -22,7 +22,7 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
   RUSTFLAGS: "-D warnings"
-  LLVM_CONFIG_PATH: llvm-config-16
+  LLVM_CONFIG_PATH: llvm-config-15
 
 jobs:
   required:
@@ -56,8 +56,8 @@ jobs:
 
       - name: Setup system
         run: |
-          sudo apt-get update && sudo apt-get upgrade -y
-          sudo apt-get install -y llvm-14-dev libclang-14-dev clang-14 build-essential
+          sudo apt-get update
+          sudo apt-get install -y llvm-15-dev libclang-15-dev clang-15 build-essential
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
