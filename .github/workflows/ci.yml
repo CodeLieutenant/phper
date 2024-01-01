@@ -57,8 +57,8 @@ jobs:
 
       - name: Setup system
         run: |
-          sudo apt-get update
-          sudo apt-get install -y llvm-15-dev libclang-15-dev clang-15 build-essential
+          apt-get update
+          apt-get install -y llvm-15-dev libclang-15-dev clang-15 build-essential
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -68,9 +68,9 @@ jobs:
 
       - name: Setup php-fpm
         run: |
-          sudo apt-get install -y php${{ matrix.php-version }}-fpm
-          sudo rm -f /usr/sbin/php-fpm
-          sudo ln -s /usr/sbin/php-fpm${{ matrix.php-version }} /usr/sbin/php-fpm
+          apt-get install -y php${{ matrix.php-version }}-fpm
+          rm -f /usr/sbin/php-fpm
+          ln -s /usr/sbin/php-fpm${{ matrix.php-version }} /usr/sbin/php-fpm
 
       - name: PHP version
         run: |
