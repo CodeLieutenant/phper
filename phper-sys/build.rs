@@ -14,6 +14,7 @@ use std::{env, ffi::OsStr, fmt::Debug, path::PathBuf, process::Command};
 fn main() {
     println!("cargo:rerun-if-env-changed=PHP_CONFIG");
     let current_dir = std::env::current_dir().unwrap();
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     let c_files = std::fs::read_dir(current_dir.join("c"))
         .unwrap()
@@ -24,17 +25,14 @@ fn main() {
     c_files
         .iter()
         .for_each(|file| println!("cargo:rerun-if-changed={}", file));
+    println!("cargo:rustc-link-search={}", out_path.to_str().unwrap());
+    println!("cargo:rustc-link-lib=static=phpwrapper");
 
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let php_config = env::var("PHP_CONFIG").unwrap_or_else(|_| "php-config".to_string());
 
     let includes = execute_command(&[php_config.as_str(), "--includes"]);
     let includes = includes.split(' ').collect::<Vec<_>>();
 
-    // Generate libphpwrapper.a.
-
-    println!("cargo:warning={:?}", includes);
-    println!("cargo:warning={:?}", c_files);
     let mut builder = cc::Build::new();
 
     includes.iter().for_each(|include| {
@@ -43,18 +41,19 @@ fn main() {
 
     builder
         .cpp(false)
-        .debug(false)
+        // .debug(false)
         .files(&c_files)
-        .extra_warnings(true)
+        // .extra_warnings(true)
         .include("include")
-        .flag("-falign-functions")
-        .flag("-flto=auto")
-        .flag("-std=c2x") // Replace with -std=c23 after CLANG 18
-        .flag("-pedantic")
-        .force_frame_pointer(false)
-        .opt_level(3)
+        // .flag("-falign-functions")
+        // .flag("-flto=auto")
+        // .flag("-std=c2x") // Replace with -std=c23 after CLANG 18
+        // .flag("-pedantic")
+        // .flag("-Wno-ignored-qualifiers")
+        // .force_frame_pointer(false)
+        // .opt_level(3)
         .warnings(true)
-        .use_plt(false)
+        // .use_plt(false)
         .static_flag(true)
         .pic(true)
         .compile("phpwrapper");

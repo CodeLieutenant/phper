@@ -14,34 +14,34 @@
 // object apis:
 // ==================================================
 
-ZEND_FASTCALL zval *phper_get_this(zend_execute_data *execute_data) {
+ zval *phper_get_this(zend_execute_data *execute_data) {
     return getThis();
 }
 
-ZEND_FASTCALL size_t phper_zend_object_properties_size(zend_class_entry *ce) {
+ size_t phper_zend_object_properties_size(zend_class_entry *ce) {
     return zend_object_properties_size(ce);
 }
 
-ZEND_FASTCALL void *phper_zend_object_alloc(size_t obj_size,
+ void *phper_zend_object_alloc(size_t obj_size,
                                             zend_class_entry *ce) {
     return zend_object_alloc(obj_size, ce);
 }
 
-ZEND_FASTCALL zend_object *(**phper_get_create_object(zend_class_entry *ce))(
+ zend_object *(**phper_get_create_object(zend_class_entry *ce))(
     zend_class_entry *class_type) {
     return &ce->create_object;
 }
 
-ZEND_FASTCALL bool phper_object_init_ex(zval *arg,
+ bool phper_object_init_ex(zval *arg,
                                         zend_class_entry *class_type) {
     return object_init_ex(arg, class_type) == SUCCESS;
 }
 
-ZEND_FASTCALL void phper_zend_object_release(zend_object *obj) {
+ void phper_zend_object_release(zend_object *obj) {
     zend_object_release(obj);
 }
 
-ZEND_FASTCALL uint32_t phper_zend_object_gc_refcount(const zend_object *obj) {
+ uint32_t phper_zend_object_gc_refcount(const zend_object *obj) {
     return GC_REFCOUNT(obj);
 }
 
@@ -49,7 +49,7 @@ ZEND_FASTCALL uint32_t phper_zend_object_gc_refcount(const zend_object *obj) {
 // class apis:
 // ==================================================
 
-ZEND_FASTCALL zend_class_entry *
+ zend_class_entry *
 phper_init_class_entry_ex(const char *class_name, size_t class_name_len,
                           const zend_function_entry *functions,
                           phper_init_class_entry_handler handler,
@@ -59,7 +59,7 @@ phper_init_class_entry_ex(const char *class_name, size_t class_name_len,
     return handler(&class_ce, argument);
 }
 
-ZEND_FASTCALL bool
+ bool
 phper_instanceof_function(const zend_class_entry *instance_ce,
                           const zend_class_entry *ce) {
     return instanceof_function(instance_ce, ce) != 0;
@@ -69,16 +69,16 @@ phper_instanceof_function(const zend_class_entry *instance_ce,
 // function apis:
 // ==================================================
 
-ZEND_FASTCALL zend_string *
+ zend_string *
 phper_get_function_or_method_name(const zend_function *func) {
     return get_function_or_method_name(func);
 }
 
-ZEND_FASTCALL zend_string *phper_get_function_name(const zend_function *func) {
+ zend_string *phper_get_function_name(const zend_function *func) {
     return func->common.function_name;
 }
 
-ZEND_FASTCALL bool phper_call_user_function(HashTable *function_table,
+ bool phper_call_user_function(HashTable *function_table,
                                             zval *object, zval *function_name,
                                             zval *retval_ptr,
                                             uint32_t param_count,
@@ -88,22 +88,22 @@ ZEND_FASTCALL bool phper_call_user_function(HashTable *function_table,
                               param_count, params) == SUCCESS;
 }
 
-ZEND_FASTCALL zval *phper_zend_call_var_num(zend_execute_data *execute_data,
+ zval *phper_zend_call_var_num(zend_execute_data *execute_data,
                                             int index) {
     return ZEND_CALL_VAR_NUM(execute_data, index);
 }
 
-ZEND_FASTCALL zval *phper_zend_call_arg(zend_execute_data *execute_data,
+ zval *phper_zend_call_arg(zend_execute_data *execute_data,
                                         int index) {
     return ZEND_CALL_ARG(execute_data, index);
 }
 
-ZEND_FASTCALL uint32_t
+ uint32_t
 phper_zend_num_args(const zend_execute_data *execute_data) {
     return ZEND_NUM_ARGS();
 }
 
-ZEND_FASTCALL bool phper_zend_get_parameters_array_ex(uint32_t param_count,
+ bool phper_zend_get_parameters_array_ex(uint32_t param_count,
                                                       zval *argument_array) {
     return zend_get_parameters_array_ex(param_count, argument_array) != 0;
 }
@@ -112,30 +112,30 @@ ZEND_FASTCALL bool phper_zend_get_parameters_array_ex(uint32_t param_count,
 // module apis:
 // ==================================================
 
-ZEND_FASTCALL const char *phper_get_zend_module_build_id() {
+ const char *phper_get_zend_module_build_id() {
     return ZEND_MODULE_BUILD_ID;
 }
 
-ZEND_FASTCALL zend_resource *
+ zend_resource *
 phper_register_persistent_resource(const zend_string *id, const void *ptr,
                                    int le_id) {
     return zend_register_persistent_resource_ex((zend_string *)id, (void *)ptr,
                                                 le_id);
 }
 
-ZEND_FASTCALL int phper_zend_register_persistent_list_destructors(
+ int phper_zend_register_persistent_list_destructors(
     rsrc_dtor_func_t dtor, const char *name, int module_number) {
     return zend_register_list_destructors_ex(NULL, dtor, name, module_number);
 }
 
-ZEND_FASTCALL int
+ int
 phper_zend_register_list_destructors(const rsrc_dtor_func_t dtor,
                                      const char *name, int module_number) {
     return zend_register_list_destructors_ex((rsrc_dtor_func_t)dtor, NULL, name,
                                              module_number);
 }
 
-ZEND_FASTCALL int
+ int
 phper_zend_register_list_destructors_ex(const rsrc_dtor_func_t dtor,
                                         const rsrc_dtor_func_t pdtor,
                                         const char *name, int module_number) {
@@ -144,11 +144,11 @@ phper_zend_register_list_destructors_ex(const rsrc_dtor_func_t dtor,
         (rsrc_dtor_func_t)dtor, (rsrc_dtor_func_t)pdtor, name, module_number);
 }
 
-ZEND_FASTCALL int phper_zend_fetch_list_dtor_id(const char *name) {
+ int phper_zend_fetch_list_dtor_id(const char *name) {
     return zend_fetch_list_dtor_id(name);
 }
 
-ZEND_FASTCALL const zend_resource *
+ const zend_resource *
 phper_register_persistent_find(const char *hash, size_t len) {
     zend_resource *zv = zend_hash_str_find_ptr(&EG(persistent_list), hash, len);
 
@@ -164,7 +164,7 @@ phper_register_persistent_find(const char *hash, size_t len) {
 // Argument API:
 // ==================================================
 
-ZEND_FASTCALL zend_internal_arg_info phper_zend_begin_arg_info_ex(
+ zend_internal_arg_info phper_zend_begin_arg_info_ex(
     bool return_reference, uintptr_t required_num_args) {
 #define static
 #define const
@@ -175,14 +175,14 @@ ZEND_FASTCALL zend_internal_arg_info phper_zend_begin_arg_info_ex(
 #undef const
 }
 
-ZEND_FASTCALL zend_internal_arg_info phper_zend_arg_info(bool pass_by_ref,
+ zend_internal_arg_info phper_zend_arg_info(bool pass_by_ref,
                                                          const char *name) {
     zend_internal_arg_info info[] = {ZEND_ARG_INFO(pass_by_ref, )};
     info[0].name = name;
     return info[0];
 }
 
-// ZEND_FASTCALL zend_internal_arg_info phper_zend_arg_info(
+//  zend_internal_arg_info phper_zend_arg_info(
 //     const char *name, int32_t type, bool return_reference, bool is_variadic,
 //     bool is_tentative, uintptr_t required_num_args) {
 //     zend_internal_arg_info info = {

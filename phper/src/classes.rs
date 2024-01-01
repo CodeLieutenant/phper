@@ -159,7 +159,7 @@ impl ClassEntry {
                 // day of debugging time here).
                 let mut val = ManuallyDrop::new(val);
                 let ptr = phper_z_obj_p(val.as_mut_ptr());
-                Ok(ZObject::from_raw(ptr))
+                Ok(ZObject::from_raw(ptr.cast_mut()))
             }
         }
     }

@@ -225,7 +225,9 @@ impl ZArr {
         let ptr = self.as_ptr() as *mut _;
         unsafe {
             match key {
-                Key::Index(i) => phper_zend_hash_index_exists(ptr, i),
+                Key::Index(i) => {
+                    phper_zend_hash_index_exists(ptr, i)
+                },
                 Key::Str(s) => {
                     phper_zend_str_exists(ptr, s.as_ptr().cast(), s.len().try_into().unwrap())
                 }
