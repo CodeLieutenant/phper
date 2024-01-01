@@ -22,14 +22,14 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
   RUSTFLAGS: "-D warnings"
-  LLVM_CONFIG_PATH: llvm-config-14
+  # LLVM_CONFIG_PATH: llvm-config-16
 
 jobs:
   required:
     name: Required
     needs:
       - ci
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Check results
         run: |
@@ -54,21 +54,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      # - name: Setup system
-      #   run: |
-      #     sudo apt-get update && sudo apt-get upgrade -y
-      #     sudo apt-get install -y llvm-14-dev libclang-14-dev clang-14 build-essential
+      - name: Setup system
+        run: |
+          sudo apt-get update && sudo apt-get upgrade -y
+          sudo apt-get install -y llvm-14-dev libclang-14-dev clang-14 build-essential
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
           tools: php-config,composer
-
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
-        with:
-          version: "16.0"
 
       - name: Setup php-fpm
         run: |
