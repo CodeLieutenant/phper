@@ -63,7 +63,12 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
-          tools: php-config,composer,composer-prefetcher
+          tools: php-config,composer
+
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: "16.0"
 
       - name: Setup php-fpm
         run: |
