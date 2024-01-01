@@ -92,21 +92,16 @@ jobs:
           toolchain: nightly
           components: rustfmt
 
-      - name: Cargo generate lockfile
-        uses: actions-rs/cargo@v1
-        with:
-          command: generate-lockfile
-
-      - name: Setup cargo cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ matrix.os }}-ci-${{ matrix.php-version }}-${{ hashFiles('**/Cargo.lock') }}
+      # - name: Setup cargo cache
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       ~/.cargo/bin/
+      #       ~/.cargo/registry/index/
+      #       ~/.cargo/registry/cache/
+      #       ~/.cargo/git/db/
+      #       target/
+      #     key: ${{ matrix.os }}-ci-${{ matrix.php-version }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cargo fmt
         uses: actions-rs/cargo@v1
