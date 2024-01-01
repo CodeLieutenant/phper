@@ -395,7 +395,7 @@ impl ZVal {
     /// Converts to string if `ZVal` is string, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_z_str(&self) -> crate::Result<&ZStr> {
-        self.inner_expect_z_str().map(|x| x)
+        self.inner_expect_z_str()
     }
 
     /// Converts to mutable string if `ZVal` is string.
@@ -429,7 +429,7 @@ impl ZVal {
     /// Converts to array if `ZVal` is array, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_z_arr(&self) -> crate::Result<&ZArr> {
-        self.inner_expect_z_arr().map(|x| x)
+        self.inner_expect_z_arr()
     }
 
     /// Converts to mutable array if `ZVal` is array.
@@ -463,7 +463,7 @@ impl ZVal {
     /// Converts to object if `ZVal` is object, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_z_obj(&self) -> crate::Result<&ZObj> {
-        self.inner_expect_z_obj().map(|x| x)
+        self.inner_expect_z_obj()
     }
 
     /// Converts to mutable object if `ZVal` is object.
@@ -503,7 +503,7 @@ impl ZVal {
     /// Converts to resource if `ZVal` is resource, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_z_res<T>(&self) -> crate::Result<&ZRes<T>> {
-        self.inner_expect_z_res::<T>().map(|x| x)
+        self.inner_expect_z_res::<T>()
     }
 
     /// Converts to mutable resource if `ZVal` is null.
@@ -537,7 +537,7 @@ impl ZVal {
     /// Converts to reference if `ZVal` is reference, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_z_ref(&self) -> crate::Result<&ZRef> {
-        self.inner_expect_z_ref().map(|x| x)
+        self.inner_expect_z_ref()
     }
 
     /// Converts to mutable reference if `ZVal` is reference.
