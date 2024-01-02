@@ -10,7 +10,7 @@
 
 //! The errors for crate and php.
 
-use crate::{classes::ClassEntry, objects::ZObject, sys::*, types::TypeInfo, values::ZVal};
+use crate::{classes::entry::ClassEntry, objects::ZObject, sys::*, types::TypeInfo, values::ZVal};
 use derive_more::Constructor;
 use phper_alloc::ToRefOwned;
 use std::{

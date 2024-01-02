@@ -9,7 +9,7 @@
 // See the Mulan PSL v2 for more details.
 
 use phper::{
-    deprecated, echo, error, functions::Argument, modules::Module, notice, php_get_module,
+    deprecated, echo, error, arguments::Argument, modules::Module, notice, php_get_module,
     values::ZVal, warning,
 };
 

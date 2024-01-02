@@ -11,8 +11,8 @@
 use crate::{errors::HttpClientError, request::REQUEST_BUILDER_CLASS};
 use phper::{
     alloc::ToRefOwned,
-    classes::{ClassEntity, StaticStateClass, Visibility},
-    functions::Argument,
+    classes::{entity::ClassEntity, StaticStateClass, Visibility},
+    arguments::Argument,
 };
 use reqwest::blocking::{Client, ClientBuilder};
 use std::{convert::Infallible, mem::take, time::Duration};

@@ -11,9 +11,11 @@
 //! Apis relate to [zend_resource].
 
 use crate::sys::*;
-use std::ffi::c_void;
-use std::fmt::{self, Debug};
-use std::marker::PhantomData;
+use std::{
+    ffi::c_void,
+    fmt::{self, Debug},
+    marker::PhantomData,
+};
 
 /// Wrapper of [zend_resource].
 #[repr(transparent)]

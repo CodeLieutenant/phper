@@ -12,51 +12,58 @@ use bindgen::Builder;
 use std::{env, ffi::OsStr, fmt::Debug, path::PathBuf, process::Command};
 
 fn main() {
-    println!("cargo:rerun-if-changed=c/php_wrapper.c");
-    println!("cargo:rerun-if-changed=c/php_args.c");
-    println!("cargo:rerun-if-env-changed=PHP_CONFIG");
-
+    let current_dir = std::env::current_dir().unwrap();
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+
+    println!("cargo:rerun-if-env-changed=PHP_CONFIG");
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rustc-link-search={}", out_path.to_str().unwrap());
+    println!("cargo:rustc-link-lib=static=phpwrapper");
+
+    let c_files = std::fs::read_dir(current_dir.join("c"))
+        .unwrap()
+        .map(|file| file.unwrap())
+        .map(|file| file.path().to_string_lossy().to_string())
+        .collect::<Vec<_>>();
+
+    c_files
+        .iter()
+        .for_each(|file| println!("cargo:rerun-if-changed={}", file));
+
     let php_config = env::var("PHP_CONFIG").unwrap_or_else(|_| "php-config".to_string());
 
     let includes = execute_command(&[php_config.as_str(), "--includes"]);
     let includes = includes.split(' ').collect::<Vec<_>>();
 
-    // Generate libphpwrapper.a.
-
     let mut builder = cc::Build::new();
-    for include in &includes {
+
+    includes.iter().for_each(|include| {
         builder.flag(include);
-    }
+    });
+
     builder
-        .file("c/php_wrapper.c")
-        .file("c/php_args.c")
+        .cpp(false)
+        .debug(false)
+        .files(&c_files)
+        .extra_warnings(false)
+        .warnings(false)
+        .include("include")
+        .flag("-std=c2x") // Replace with -std=c23 after CLANG 18
+        .force_frame_pointer(false)
+        .opt_level(3)
+        .use_plt(false)
+        .static_flag(true)
+        .pic(true)
         .compile("phpwrapper");
 
-    // Generate bindgen file.
-    let include_dirs = includes
-        .iter()
-        .map(|include| &include[2..])
-        .collect::<Vec<_>>();
-
-    for dir in include_dirs.iter() {
-        println!("cargo:include={}", dir);
-    }
-
     let mut builder = Builder::default()
-        .header("php_wrapper.c")
-        .allowlist_file("php_wrapper\\.c")
+        .header("include/phper.h")
+        .allowlist_file("include/phper.h")
+        // .allowlist_recursively(true)
         // Block the `zend_ini_parse_quantity` because it's document causes the doc test to fail.
         .blocklist_function("zend_ini_parse_quantity")
-        .clang_args(&includes)
-        .clang_args(&[
-            "-falign-functions",
-            "-flto=auto",
-            "-std=c17",
-            "-pedantic",
-            "-Wextra",
-        ])
         .derive_hash(true)
+        .clang_args(&includes)
         .derive_copy(true)
         .derive_eq(true)
         .derive_ord(true)
@@ -66,17 +73,17 @@ fn main() {
 
     // iterate over the php include directories, and update the builder
     // to only create bindings from the header files in those directories
-    for dir in include_dirs.iter() {
+    for dir in includes.iter().map(|include| &include[2..]) {
+        println!("cargo:include={}", dir);
         let p = PathBuf::from(dir).join(".*\\.h");
         builder = builder.allowlist_file(p.display().to_string());
     }
 
-    let generated_path = out_path.join("php_bindings.rs");
+    let bindings = builder.generate().expect("Unable to generate bindings");
 
-    builder
-        .generate()
-        .expect("Unable to generate bindings")
-        .write_to_file(generated_path)
+    // print!("cargo:warning={}", bindings.to_string());
+    bindings
+        .write_to_file(out_path.join("php_bindings.rs"))
         .expect("Unable to write output file");
 }
 

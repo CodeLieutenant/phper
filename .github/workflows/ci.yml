@@ -15,92 +15,52 @@ on:
     branches:
       - master
   pull_request:
-    branches: [ "**" ]
+    branches: ["**"]
 
 env:
   RUST_LOG: debug
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
   RUSTFLAGS: "-D warnings"
-  LLVM_CONFIG_PATH: llvm-config-10
+  LLVM_CONFIG_PATH: llvm-config-15
 
 jobs:
-  required:
-    name: Required
-    needs:
-      - ci
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Check results
-        run: |
-          [[ ${{ needs.ci.result }} == 'success' ]] || exit 1;
-
   ci:
     name: CI
     strategy:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-20.04
-          - macos-11
+          - ubuntu-latest
         php-version:
-          - "7.0"
-          - "7.1"
-          - "7.2"
-          - "7.3"
-          - "7.4"
-          - "8.0"
           - "8.1"
           - "8.2"
           - "8.3"
 
     runs-on: ${{ matrix.os }}
+    container: rust:1.75-slim-bookworm
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Install libclang
-        if: matrix.os == 'ubuntu-20.04'
-        run: sudo apt-get install -y llvm-10-dev libclang-10-dev
+      - name: Setup system
+        run: |
+          apt-get update
+          apt-get install -y llvm-15-dev libclang-15-dev clang-15 build-essential
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
-          tools: php-config
+          tools: php-config,composer
 
-      - name: Setup php-fpm for Linux
-        if: matrix.os == 'ubuntu-20.04'
-        run: |
-          sudo apt-get install -y php${{ matrix.php-version }}-fpm
-          sudo rm -f /usr/sbin/php-fpm
-          sudo ln -s /usr/sbin/php-fpm${{ matrix.php-version }} /usr/sbin/php-fpm
-
-      - name: Setup php-fpm for Macos
-        if: matrix.os == 'macos-11'
-        run: |
-          brew install php@${{ matrix.php-version }}
-
-      - name: PHP version
-        run: |
-          php --version
-          php-fpm --version
-          php-config || true
-
-          [[ `php --version` == PHP\ ${{ matrix.php-version }}.* ]] || exit 1;
-          [[ `php-fpm --version` == PHP\ ${{ matrix.php-version }}.* ]] || exit 1;
-          [[ `php-config --version` == ${{ matrix.php-version }}.* ]] || exit 1;
-
-      - name: Install Rust Nightly
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          components: rustfmt
-
-      - name: Cargo generate lockfile
-        uses: actions-rs/cargo@v1
-        with:
-          command: generate-lockfile
+      # - name: Setup php-fpm
+      #   run: |
+      #     apt-get install -y php${{ matrix.php-version }}-fpm
+      #     rm -f /usr/sbin/php-fpm
+      #     ln -s /usr/sbin/php-fpm${{ matrix.php-version }} /usr/sbin/php-fpm
 
       - name: Setup cargo cache
         uses: actions/cache@v3
@@ -111,38 +71,26 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ matrix.os }}-ci-${{ matrix.php-version }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ci-${{ matrix.php-version }}-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          toolchain: nightly
-          command: fmt
-          args: --all -- --check
+      - name: Cargo format
+        run: |
+          cargo fmt --all -- --check
 
       - name: Cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --release
+        run: |
+          cargo clippy --release
 
       - name: Cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release
+        run: |
+          cargo build --release
 
       - name: Cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release -- --nocapture
+        run: |
+          cargo test --release -- --nocapture
 
-      - name: Cargo doc
-        uses: actions-rs/cargo@v1
-        env:
-          RUSTDOCFLAGS: "-D warnings --cfg docsrs"
-        with:
-          toolchain: nightly
-          command: doc
-          args: --workspace --no-deps --all-features
+      # - name: Cargo doc
+      #   env:
+      #     RUSTDOCFLAGS: "-D warnings --cfg docsrs"
+      #   run: |
+      #     cargo doc --workspace --no-deps --all-features

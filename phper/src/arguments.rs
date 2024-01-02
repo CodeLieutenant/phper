@@ -23,8 +23,12 @@ pub struct Argument {
 
 impl Argument {
     /// Indicate the argument is pass by value.
-    pub fn by_val(name: impl AsRef<String>) -> Self {
-        let name = ensure_end_with_zero(name);
+    pub fn by_val(name: impl AsRef<str>) -> Self {
+        let name = unsafe {
+            let name = name.as_ref().as_bytes().to_vec();
+            CString::from_vec_unchecked(name)
+        };
+
         Self {
             name,
             pass_by_ref: false,

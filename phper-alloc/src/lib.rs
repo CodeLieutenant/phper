@@ -15,7 +15,7 @@
 #[macro_use]
 mod macros;
 
-use phper_sys::*;
+use phper_sys::{phper_efree, phper_emalloc};
 use std::{
     borrow::Borrow,
     mem::{size_of, ManuallyDrop},

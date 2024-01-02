@@ -12,10 +12,10 @@
 //!
 //! TODO Add lambda.
 
-use crate::arguments::Argument;
 use crate::{
+    arguments::Argument,
     cg,
-    classes::{ClassEntry, RawVisibility, Visibility},
+    classes::{entry::ClassEntry, RawVisibility, Visibility},
     errors::{throw, ArgumentCountError, ExceptionGuard, ThrowObject, Throwable},
     objects::{StateObj, ZObj, ZObject},
     strings::{ZStr, ZString},
@@ -80,7 +80,10 @@ where
     E: Throwable,
 {
     fn call(
-        &self, execute_data: &mut ExecuteData, arguments: &mut [ZVal], return_value: &mut ZVal,
+        &self,
+        execute_data: &mut ExecuteData,
+        arguments: &mut [ZVal],
+        return_value: &mut ZVal,
     ) {
         let this = unsafe { execute_data.get_this_mut().unwrap().as_mut_state_obj() };
         match (self.0)(this, arguments) {
@@ -125,7 +128,9 @@ impl FunctionEntry {
 
     /// Will leak memory
     unsafe fn entry(
-        name: &CStr, arguments: &[Argument], handler: Option<Rc<dyn Callable>>,
+        name: &CStr,
+        arguments: &[Argument],
+        handler: Option<Rc<dyn Callable>>,
         visibility: Option<RawVisibility>,
     ) -> zend_function_entry {
         let mut infos = Vec::new();
@@ -207,7 +212,9 @@ pub struct MethodEntity {
 impl MethodEntity {
     #[inline]
     pub(crate) fn new(
-        name: impl Into<String>, handler: Option<Rc<dyn Callable>>, visibility: Visibility,
+        name: impl Into<String>,
+        handler: Option<Rc<dyn Callable>>,
+        visibility: Visibility,
     ) -> Self {
         Self {
             name: ensure_end_with_zero(name),
@@ -306,7 +313,9 @@ impl ZFunc {
 
     #[allow(clippy::useless_conversion)]
     pub(crate) fn call(
-        &mut self, mut object: Option<&mut ZObj>, mut arguments: impl AsMut<[ZVal]>,
+        &mut self,
+        mut object: Option<&mut ZObj>,
+        mut arguments: impl AsMut<[ZVal]>,
     ) -> crate::Result<ZVal> {
         let arguments = arguments.as_mut();
         let function_handler = self.as_mut_ptr();
@@ -404,7 +413,9 @@ pub fn call(callable: impl Into<ZVal>, arguments: impl AsMut<[ZVal]>) -> crate::
 }
 
 pub(crate) fn call_internal(
-    func: &mut ZVal, mut object: Option<&mut ZObj>, mut arguments: impl AsMut<[ZVal]>,
+    func: &mut ZVal,
+    mut object: Option<&mut ZObj>,
+    mut arguments: impl AsMut<[ZVal]>,
 ) -> crate::Result<ZVal> {
     let func_ptr = func.as_mut_ptr();
     let arguments = arguments.as_mut();

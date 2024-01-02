@@ -63,7 +63,7 @@ Interface can add public abstract methods.
 
 ```rust,no_run
 use phper::classes::{InterfaceEntity, ClassEntry, Visibility};
-use phper::functions::Argument;
+use phper::arguments::Argument;
 use phper::objects::StateObj;
 use phper::values::ZVal;
 

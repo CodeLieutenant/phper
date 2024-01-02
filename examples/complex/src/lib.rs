@@ -10,8 +10,8 @@
 
 use phper::{
     arrays::ZArray,
-    classes::{ClassEntity, Visibility},
-    functions::Argument,
+    classes::{entity::ClassEntity, Visibility},
+    arguments::Argument,
     ini::{ini_get, Policy},
     modules::Module,
     objects::StateObj,

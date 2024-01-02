@@ -94,35 +94,35 @@ Now let's begin to finish the logic.
        classes::{ClassEntry, ClassEntity},
        errors::{exception_class, Throwable},
    };
-   
+
    /// The exception class name of extension.
    const EXCEPTION_CLASS_NAME: &str = "HttpClient\\HttpClientException";
-   
+
    pub fn make_exception_class() -> ClassEntity<()> {
        let mut class = ClassEntity::new(EXCEPTION_CLASS_NAME);
        // The `extends` is same as the PHP class `extends`.
        class.extends(exception_class);
        class
    }
-   
+
    #[derive(Debug, thiserror::Error)]
    pub enum HttpClientError {
        #[error(transparent)]
        Reqwest(reqwest::Error),
-   
+
        #[error("should call '{method_name}()' before call 'body()'")]
        ResponseAfterRead { method_name: String },
-   
+
        #[error("should not call 'body()' multi time")]
        ResponseHadRead,
    }
-   
+
    impl Throwable for HttpClientError {
        fn get_class(&self) -> &ClassEntry {
            ClassEntry::from_globals(EXCEPTION_CLASS_NAME).unwrap_or_else(|_| exception_class())
        }
    }
-   
+
    impl From<HttpClientError> for phper::Error {
        fn from(e: HttpClientError) -> Self {
            phper::Error::throw(e)
@@ -186,11 +186,11 @@ Now let's begin to finish the logic.
    use phper::{
        alloc::ToRefOwned,
        classes::{StaticStateClass, Visibility},
-       functions::Argument,
+       arguments::Argument,
    };
    use reqwest::blocking::{Client, ClientBuilder};
    use std::{mem::take, time::Duration};
-   
+
    const HTTP_CLIENT_BUILDER_CLASS_NAME: &str = "HttpClient\\HttpClientBuilder";
 
    const HTTP_CLIENT_CLASS_NAME: &str = "HttpClient\\HttpClient";
@@ -198,12 +198,12 @@ Now let's begin to finish the logic.
    // The static StaticStateClass is bind to ClassEntity of HttpClient, When the class registered,
    // the StaticStateClass will be initialized, so you can use it to new stateful object, etc.
    static HTTP_CLIENT_CLASS:StaticStateClass<Option<Client>> =StaticStateClass::null();
-   
+
    pub fn make_client_builder_class() -> ClassEntity<ClientBuilder> {
        // `new_with_default_state_constructor` means initialize the state of `ClientBuilder` as
        // `Default::default`.
        let mut class = ClassEntity::new_with_default_state_constructor(HTTP_CLIENT_BUILDER_CLASS_NAME);
-   
+
        // Inner call the `ClientBuilder::timeout`.
        class
            .add_method("timeout", Visibility::Public, |this, arguments| {
@@ -214,7 +214,7 @@ Now let's begin to finish the logic.
                Ok::<_, phper::Error>(this.to_ref_owned())
            })
            .argument(Argument::by_val("ms"));
-   
+
        // Inner call the `ClientBuilder::cookie_store`.
        class
            .add_method("cookie_store", Visibility::Public, |this, arguments| {
@@ -225,7 +225,7 @@ Now let's begin to finish the logic.
                Ok::<_, phper::Error>(this.to_ref_owned())
            })
            .argument(Argument::by_val("enable"));
-   
+
        // Inner call the `ClientBuilder::build`, and wrap the result `Client` in
        // Object.
        class.add_method("build", Visibility::Public, |this, _arguments| {
@@ -235,7 +235,7 @@ Now let's begin to finish the logic.
            *object.as_mut_state() = Some(client);
            Ok::<_, phper::Error>(object)
        });
-   
+
        class
    }
    ```

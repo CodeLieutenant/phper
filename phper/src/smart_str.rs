@@ -1,11 +1,11 @@
 //! Apis relate to [zend_string](crate::sys::smart_str).
 
-use std::ffi::c_char;
-use std::fmt::Debug;
-use std::mem::MaybeUninit;
+use std::{ffi::c_char, fmt::Debug, mem::MaybeUninit};
 
-use crate::strings::{ZStr, ZString};
-use crate::sys::*;
+use crate::{
+    strings::{ZStr, ZString},
+    sys::*,
+};
 
 /// PHP String Builder for [zend_string](crate::sys::smart_str).
 #[repr(transparent)]
@@ -173,10 +173,12 @@ impl ZSmartStr {
 
     #[inline]
     pub fn append_string_escaped(
-        &mut self, str: impl Into<*const c_char>, len: usize,
+        &mut self,
+        str: impl Into<*const c_char>,
+        len: usize,
     ) -> &mut Self {
         unsafe {
-            smart_str_append_escaped(&mut self.inner, str.into(), len);
+            phper_smart_str_append_escaped(&mut self.inner, str.into(), len);
         }
 
         self
@@ -185,10 +187,12 @@ impl ZSmartStr {
     /// Appends zend_string up to the supplied length and escapes it.
     #[inline]
     pub fn append_string_escaped_truncated(
-        &mut self, str: impl Into<*mut zend_string>, len: usize,
+        &mut self,
+        str: impl Into<*mut zend_string>,
+        len: usize,
     ) -> &mut Self {
         unsafe {
-            smart_str_append_escaped_truncated(&mut self.inner, str.into(), len);
+            phper_smart_str_append_escaped_truncated(&mut self.inner, str.into(), len);
         }
 
         self
@@ -235,7 +239,10 @@ impl ZSmartStr {
     /// Appends float to the smart str.
     #[inline]
     pub fn append_float(
-        &mut self, num: impl Into<f32>, precision: i32, zero_fraction: bool,
+        &mut self,
+        num: impl Into<f32>,
+        precision: i32,
+        zero_fraction: bool,
     ) -> &mut Self {
         unsafe {
             phper_smart_str_append_double(
@@ -263,7 +270,10 @@ impl ZSmartStr {
 
     #[inline]
     pub fn append_double(
-        &mut self, num: impl Into<f64>, precision: i32, zero_fraction: bool,
+        &mut self,
+        num: impl Into<f64>,
+        precision: i32,
+        zero_fraction: bool,
     ) -> &mut Self {
         unsafe {
             phper_smart_str_append_double(&mut self.inner, num.into(), precision, zero_fraction)
@@ -283,8 +293,9 @@ impl ZSmartStr {
         self
     }
 
-    /// Extracts the ZendString from the smart_str builder and drops the allocated memory.
-    /// Don't forget to call `append_null_byte` before build.
+    /// Extracts the ZendString from the smart_str builder and drops the
+    /// allocated memory. Don't forget to call `append_null_byte` before
+    /// build.
     #[inline]
     pub fn build(self) -> ZString {
         unsafe {

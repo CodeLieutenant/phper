@@ -11,7 +11,7 @@
 //! Apis relate to [zend_object].
 
 use crate::{
-    classes::ClassEntry,
+    classes::entry::ClassEntry,
     functions::{call_internal, call_raw_common, ZFunc},
     sys::*,
     values::ZVal,
@@ -148,7 +148,9 @@ impl ZObj {
 
     #[allow(clippy::useless_conversion)]
     fn inner_get_property(
-        scope: *mut zend_class_entry, object: *mut zend_object, name: impl AsRef<str>,
+        scope: *mut zend_class_entry,
+        object: *mut zend_object,
+        name: impl AsRef<str>,
     ) -> *mut zval {
         let name = name.as_ref();
 
@@ -229,7 +231,9 @@ impl ZObj {
     /// }
     /// ```
     pub fn call(
-        &mut self, method_name: &str, arguments: impl AsMut<[ZVal]>,
+        &mut self,
+        method_name: &str,
+        arguments: impl AsMut<[ZVal]>,
     ) -> crate::Result<ZVal> {
         let mut method = method_name.into();
         call_internal(&mut method, Some(self), arguments)
@@ -299,7 +303,8 @@ impl ZObject {
 
     /// New object, like `new`, but get class by [`ClassEntry::from_globals`].
     pub fn new_by_class_name(
-        class_name: impl AsRef<str>, arguments: &mut [ZVal],
+        class_name: impl AsRef<str>,
+        arguments: &mut [ZVal],
     ) -> crate::Result<Self> {
         let class_entry = ClassEntry::from_globals(class_name)?;
         Self::new(class_entry, arguments)

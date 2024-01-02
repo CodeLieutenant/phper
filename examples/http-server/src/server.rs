@@ -18,8 +18,8 @@ use axum::{
 use hyper::body;
 use phper::{
     alloc::ToRefOwned,
-    classes::{ClassEntity, Visibility},
-    functions::Argument,
+    classes::{entity::ClassEntity, Visibility},
+    arguments::Argument,
     values::ZVal,
 };
 use std::{cell::RefCell, collections::HashMap, net::SocketAddr};

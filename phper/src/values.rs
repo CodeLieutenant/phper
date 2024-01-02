@@ -328,12 +328,21 @@ impl ZVal {
     /// assert_eq!(val.expect_long().unwrap(), 200);
     /// ```
     pub fn expect_mut_long(&mut self) -> crate::Result<&mut i64> {
-        self.inner_expect_long()
+        if self.get_type_info().is_long() {
+            unsafe {
+                Ok(phper_z_lval_p(self.as_ptr() as *const _)
+                    .cast_mut()
+                    .as_mut()
+                    .unwrap())
+            }
+        } else {
+            Err(ExpectTypeError::new(TypeInfo::LONG, self.get_type_info()).into())
+        }
     }
 
-    fn inner_expect_long(&self) -> crate::Result<&mut i64> {
+    fn inner_expect_long(&self) -> crate::Result<&i64> {
         if self.get_type_info().is_long() {
-            unsafe { Ok(phper_z_lval_p(self.as_ptr() as *mut _).as_mut().unwrap()) }
+            unsafe { Ok(phper_z_lval_p(self.as_ptr() as *const _).as_ref().unwrap()) }
         } else {
             Err(ExpectTypeError::new(TypeInfo::LONG, self.get_type_info()).into())
         }
@@ -358,12 +367,21 @@ impl ZVal {
     /// Converts to mutable double if `ZVal` is double, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_mut_double(&mut self) -> crate::Result<&mut f64> {
-        self.inner_expect_double()
+        if self.get_type_info().is_double() {
+            unsafe {
+                Ok(phper_z_dval_p(self.as_ptr() as *mut _)
+                    .cast_mut()
+                    .as_mut()
+                    .unwrap())
+            }
+        } else {
+            Err(ExpectTypeError::new(TypeInfo::DOUBLE, self.get_type_info()).into())
+        }
     }
 
-    fn inner_expect_double(&self) -> crate::Result<&mut f64> {
+    fn inner_expect_double(&self) -> crate::Result<&f64> {
         if self.get_type_info().is_double() {
-            unsafe { Ok(phper_z_dval_p(self.as_ptr() as *mut _).as_mut().unwrap()) }
+            unsafe { Ok(phper_z_dval_p(self.as_ptr() as *mut _).as_ref().unwrap()) }
         } else {
             Err(ExpectTypeError::new(TypeInfo::DOUBLE, self.get_type_info()).into())
         }
@@ -377,7 +395,7 @@ impl ZVal {
     /// Converts to string if `ZVal` is string, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_z_str(&self) -> crate::Result<&ZStr> {
-        self.inner_expect_z_str().map(|x| &*x)
+        self.inner_expect_z_str()
     }
 
     /// Converts to mutable string if `ZVal` is string.
@@ -388,12 +406,16 @@ impl ZVal {
     /// Converts to mutable string if `ZVal` is string, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_mut_z_str(&mut self) -> crate::Result<&mut ZStr> {
-        self.inner_expect_z_str()
+        if self.get_type_info().is_string() {
+            unsafe { Ok(ZStr::from_mut_ptr(phper_z_str_p(self.as_ptr()).cast_mut())) }
+        } else {
+            Err(ExpectTypeError::new(TypeInfo::STRING, self.get_type_info()).into())
+        }
     }
 
-    fn inner_expect_z_str(&self) -> crate::Result<&mut ZStr> {
+    fn inner_expect_z_str(&self) -> crate::Result<&ZStr> {
         if self.get_type_info().is_string() {
-            unsafe { Ok(ZStr::from_mut_ptr(phper_z_str_p(self.as_ptr()))) }
+            unsafe { Ok(ZStr::from_ptr(phper_z_str_p(self.as_ptr()))) }
         } else {
             Err(ExpectTypeError::new(TypeInfo::STRING, self.get_type_info()).into())
         }
@@ -407,7 +429,7 @@ impl ZVal {
     /// Converts to array if `ZVal` is array, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_z_arr(&self) -> crate::Result<&ZArr> {
-        self.inner_expect_z_arr().map(|x| &*x)
+        self.inner_expect_z_arr()
     }
 
     /// Converts to mutable array if `ZVal` is array.
@@ -418,12 +440,16 @@ impl ZVal {
     /// Converts to mutable array if `ZVal` is array, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_mut_z_arr(&mut self) -> crate::Result<&mut ZArr> {
-        self.inner_expect_z_arr()
+        if self.get_type_info().is_array() {
+            unsafe { Ok(ZArr::from_mut_ptr(phper_z_arr_p(self.as_ptr()).cast_mut())) }
+        } else {
+            Err(ExpectTypeError::new(TypeInfo::ARRAY, self.get_type_info()).into())
+        }
     }
 
-    fn inner_expect_z_arr(&self) -> crate::Result<&mut ZArr> {
+    fn inner_expect_z_arr(&self) -> crate::Result<&ZArr> {
         if self.get_type_info().is_array() {
-            unsafe { Ok(ZArr::from_mut_ptr(phper_z_arr_p(self.as_ptr()))) }
+            unsafe { Ok(ZArr::from_ptr(phper_z_arr_p(self.as_ptr()))) }
         } else {
             Err(ExpectTypeError::new(TypeInfo::ARRAY, self.get_type_info()).into())
         }
@@ -437,7 +463,7 @@ impl ZVal {
     /// Converts to object if `ZVal` is object, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_z_obj(&self) -> crate::Result<&ZObj> {
-        self.inner_expect_z_obj().map(|x| &*x)
+        self.inner_expect_z_obj()
     }
 
     /// Converts to mutable object if `ZVal` is object.
@@ -448,14 +474,21 @@ impl ZVal {
     /// Converts to mutable object if `ZVal` is object, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_mut_z_obj(&mut self) -> crate::Result<&mut ZObj> {
-        self.inner_expect_z_obj()
+        if self.get_type_info().is_object() {
+            unsafe {
+                let ptr = phper_z_obj_p(self.as_ptr()).cast_mut();
+                Ok(ZObj::from_mut_ptr(ptr))
+            }
+        } else {
+            Err(ExpectTypeError::new(TypeInfo::OBJECT, self.get_type_info()).into())
+        }
     }
 
-    fn inner_expect_z_obj(&self) -> crate::Result<&mut ZObj> {
+    fn inner_expect_z_obj(&self) -> crate::Result<&ZObj> {
         if self.get_type_info().is_object() {
             unsafe {
                 let ptr = phper_z_obj_p(self.as_ptr());
-                Ok(ZObj::from_mut_ptr(ptr))
+                Ok(ZObj::from_ptr(ptr))
             }
         } else {
             Err(ExpectTypeError::new(TypeInfo::OBJECT, self.get_type_info()).into())
@@ -470,7 +503,7 @@ impl ZVal {
     /// Converts to resource if `ZVal` is resource, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_z_res<T>(&self) -> crate::Result<&ZRes<T>> {
-        self.inner_expect_z_res::<T>().map(|x| &*x)
+        self.inner_expect_z_res::<T>()
     }
 
     /// Converts to mutable resource if `ZVal` is null.
@@ -481,12 +514,16 @@ impl ZVal {
     /// Converts to mutable resource if `ZVal` is resource, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_mut_z_res<T>(&mut self) -> crate::Result<&mut ZRes<T>> {
-        self.inner_expect_z_res::<T>()
+        if self.get_type_info().is_resource() {
+            unsafe { Ok(ZRes::from_mut_ptr(phper_z_res_p(self.as_ptr()).cast_mut())) }
+        } else {
+            Err(ExpectTypeError::new(TypeInfo::RESOURCE, self.get_type_info()).into())
+        }
     }
 
-    fn inner_expect_z_res<T>(&self) -> crate::Result<&mut ZRes<T>> {
+    fn inner_expect_z_res<T>(&self) -> crate::Result<&ZRes<T>> {
         if self.get_type_info().is_resource() {
-            unsafe { Ok(ZRes::from_mut_ptr(phper_z_res_p(self.as_ptr()))) }
+            unsafe { Ok(ZRes::from_ptr(phper_z_res_p(self.as_ptr()))) }
         } else {
             Err(ExpectTypeError::new(TypeInfo::RESOURCE, self.get_type_info()).into())
         }
@@ -500,7 +537,7 @@ impl ZVal {
     /// Converts to reference if `ZVal` is reference, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_z_ref(&self) -> crate::Result<&ZRef> {
-        self.inner_expect_z_ref().map(|x| &*x)
+        self.inner_expect_z_ref()
     }
 
     /// Converts to mutable reference if `ZVal` is reference.
@@ -511,12 +548,16 @@ impl ZVal {
     /// Converts to mutable reference if `ZVal` is reference, otherwise returns
     /// [`ExpectTypeError`].
     pub fn expect_mut_z_ref(&mut self) -> crate::Result<&mut ZRef> {
-        self.inner_expect_z_ref()
+        if self.get_type_info().is_reference() {
+            unsafe { Ok(ZRef::from_mut_ptr(phper_z_ref_p(self.as_ptr()).cast_mut())) }
+        } else {
+            Err(ExpectTypeError::new(TypeInfo::REFERENCE, self.get_type_info()).into())
+        }
     }
 
-    fn inner_expect_z_ref(&self) -> crate::Result<&mut ZRef> {
+    fn inner_expect_z_ref(&self) -> crate::Result<&ZRef> {
         if self.get_type_info().is_reference() {
-            unsafe { Ok(ZRef::from_mut_ptr(phper_z_ref_p(self.as_ptr()))) }
+            unsafe { Ok(ZRef::from_ptr(phper_z_ref_p(self.as_ptr()))) }
         } else {
             Err(ExpectTypeError::new(TypeInfo::REFERENCE, self.get_type_info()).into())
         }
@@ -661,22 +702,17 @@ impl From<bool> for ZVal {
     fn from(b: bool) -> Self {
         unsafe {
             let mut val = MaybeUninit::<ZVal>::uninit();
-            if b {
-                phper_zval_true(val.as_mut_ptr().cast());
-            } else {
-                phper_zval_false(val.as_mut_ptr().cast());
-            }
+            phper_zval_bool(val.as_mut_ptr().cast(), b);
             val.assume_init()
         }
     }
 }
 
 impl From<i64> for ZVal {
-    #[allow(clippy::useless_conversion)]
     fn from(i: i64) -> Self {
         unsafe {
             let mut val = MaybeUninit::<ZVal>::uninit();
-            phper_zval_long(val.as_mut_ptr().cast(), i.try_into().unwrap());
+            phper_zval_long(val.as_mut_ptr().cast(), i);
             val.assume_init()
         }
     }
@@ -687,7 +723,7 @@ impl From<f64> for ZVal {
     fn from(f: f64) -> Self {
         unsafe {
             let mut val = MaybeUninit::<ZVal>::uninit();
-            phper_zval_double(val.as_mut_ptr().cast(), f.try_into().unwrap());
+            phper_zval_double(val.as_mut_ptr().cast(), f);
             val.assume_init()
         }
     }
