@@ -17,7 +17,7 @@ mod macros;
 
 pub mod arrays;
 pub mod classes;
-pub(crate) mod constants;
+pub mod constants;
 pub mod errors;
 pub mod functions;
 pub mod ini;

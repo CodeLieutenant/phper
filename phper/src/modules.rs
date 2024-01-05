@@ -10,6 +10,7 @@
 
 //! Apis relate to [zend_module_entry].
 
+use crate::constants;
 use crate::{
     c_str_ptr,
     classes::{entity::ClassEntity, InterfaceEntity},
@@ -228,8 +229,8 @@ impl Module {
     }
 
     /// Register constant to module.
-    pub fn add_constant(&mut self, name: impl Into<String>, value: impl Into<Scalar>) {
-        self.constants.push(Constant::new(name, value));
+    pub fn add_constant(&mut self, name: impl Into<String>, value: impl Into<Scalar>, flags: Option<constants::Flags>) {
+        self.constants.push(Constant::new(name, value, flags));
     }
 
     /// Register ini configuration to module.
