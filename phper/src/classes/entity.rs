@@ -256,43 +256,6 @@ impl<T: 'static> ClassEntity<T> {
         }));
     }
 
-    #[allow(clippy::useless_conversion)]
-    pub(crate) unsafe fn init(&self) -> *mut zend_class_entry {
-        let parent: *mut zend_class_entry = self
-            .parent
-            .as_ref()
-            .map(|parent| parent())
-            .map(|entry| entry.as_ptr() as *mut _)
-            .unwrap_or(null_mut());
-
-        let class_ce = phper_init_class_entry_ex(
-            self.class_name.as_ptr().cast(),
-            self.class_name.as_bytes().len().try_into().unwrap(),
-            self.function_entries(),
-            Some(class_init_handler),
-            parent.cast(),
-        );
-
-        if let Some(bind_class) = self.bind_class {
-            bind_class.bind(class_ce);
-        }
-
-        for interface in &self.interfaces {
-            let interface_ce = interface().as_ptr();
-            zend_class_implements(class_ce, 1, interface_ce);
-        }
-
-        *phper_get_create_object(class_ce) = Some(create_object);
-
-        class_ce
-    }
-
-    pub(crate) unsafe fn declare_properties(&self, ce: *mut zend_class_entry) {
-        for property in &self.property_entities {
-            property.declare(ce);
-        }
-    }
-
     unsafe fn function_entries(&self) -> *const zend_function_entry {
         let mut methods = self
             .method_entities
@@ -327,5 +290,43 @@ impl<T: 'static> ClassEntity<T> {
             ptr.write(state_constructor);
         }
         entry
+    }
+}
+
+impl<T: 'static> crate::modules::Registerer for ClassEntity<T> {
+    fn register(&mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
+        unsafe {
+            let parent: *mut zend_class_entry = self
+                .parent
+                .as_ref()
+                .map(|parent| parent())
+                .map(|entry| entry.as_ptr() as *mut _)
+                .unwrap_or(null_mut());
+
+            let class_ce = phper_init_class_entry_ex(
+                self.class_name.as_ptr().cast(),
+                self.class_name.as_bytes().len(),
+                self.function_entries(),
+                Some(class_init_handler),
+                parent.cast(),
+            );
+
+            if let Some(bind_class) = self.bind_class {
+                bind_class.bind(class_ce);
+            }
+
+            for interface in &self.interfaces {
+                let interface_ce = interface().as_ptr();
+                zend_class_implements(class_ce, 1, interface_ce);
+            }
+
+            *phper_get_create_object(class_ce) = Some(create_object);
+
+            for property in &self.property_entities {
+                property.declare(class_ce);
+            }
+        }
+
+        Ok(())
     }
 }

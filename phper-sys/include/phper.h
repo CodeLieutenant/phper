@@ -288,3 +288,11 @@ phper_register_persistent_find(const char *hash, size_t len);
     bool return_reference, uintptr_t required_num_args);
  zend_internal_arg_info phper_zend_arg_info(bool pass_by_ref,
                                                          const char *name);
+ // ==================================================
+ // Constants API:
+ // ==================================================
+ zend_constant phper_create_constant(const char *name, size_t name_len,
+                                     zval val, int flags);
+
+ zend_result phper_register_constant(zend_constant *constant, int flags,
+                                     int module_number);

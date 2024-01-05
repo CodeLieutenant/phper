@@ -180,7 +180,7 @@ impl ExecuteData {
 /// Wrapper of [zval].
 #[repr(transparent)]
 pub struct ZVal {
-    inner: zval,
+    pub(crate) inner: zval,
     _p: PhantomData<*mut ()>,
 }
 

@@ -374,70 +374,20 @@ impl ZFunc {
             .unwrap_or(null_mut());
 
         call_raw_common(|ret| unsafe {
-            #[cfg(phper_major_version = "8")]
-            {
-                let class_ptr = object
-                    .as_mut()
-                    .map(|o| o.get_mut_class().as_mut_ptr())
-                    .unwrap_or(null_mut());
+            let class_ptr = object
+                .as_mut()
+                .map(|o| o.get_mut_class().as_mut_ptr())
+                .unwrap_or(null_mut());
 
-                zend_call_known_function(
-                    function_handler,
-                    object_ptr,
-                    class_ptr,
-                    ret.as_mut_ptr(),
-                    arguments.len() as u32,
-                    arguments.as_mut_ptr().cast(),
-                    null_mut(),
-                );
-            }
-            #[cfg(phper_major_version = "7")]
-            {
-                use std::mem::size_of;
-
-                let called_scope = {
-                    let mut called_scope = object
-                        .as_mut()
-                        .map(|o| o.get_class().as_ptr() as *mut zend_class_entry)
-                        .unwrap_or(null_mut());
-                    if called_scope.is_null() {
-                        called_scope = self.inner.common.scope;
-                    }
-                    called_scope
-                };
-
-                let mut fci = zend_fcall_info {
-                    size: size_of::<zend_fcall_info>().try_into().unwrap(),
-                    function_name: ZVal::from(()).into_inner(),
-                    retval: ret.as_mut_ptr(),
-                    params: arguments.as_mut_ptr().cast(),
-                    object: object_ptr,
-                    param_count: arguments.len() as u32,
-                    no_separation: 1,
-                    #[cfg(all(phper_major_version = "7", phper_minor_version = "0"))]
-                    function_table: null_mut(),
-                    #[cfg(all(phper_major_version = "7", phper_minor_version = "0"))]
-                    symbol_table: null_mut(),
-                };
-
-                let mut fcc = zend_fcall_info_cache {
-                    function_handler,
-                    calling_scope: null_mut(),
-                    called_scope,
-                    object: object_ptr,
-                    #[cfg(all(
-                        phper_major_version = "7",
-                        any(
-                            phper_minor_version = "2",
-                            phper_minor_version = "1",
-                            phper_minor_version = "0",
-                        )
-                    ))]
-                    initialized: 1,
-                };
-
-                zend_call_function(&mut fci, &mut fcc);
-            }
+            zend_call_known_function(
+                function_handler,
+                object_ptr,
+                class_ptr,
+                ret.as_mut_ptr(),
+                arguments.len() as u32,
+                arguments.as_mut_ptr().cast(),
+                null_mut(),
+            );
         })
     }
 }

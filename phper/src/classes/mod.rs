@@ -249,28 +249,6 @@ impl InterfaceEntity {
         self.bind_interface = Some(i);
     }
 
-    #[allow(clippy::useless_conversion)]
-    pub(crate) unsafe fn init(&self) -> *mut zend_class_entry {
-        let class_ce = phper_init_class_entry_ex(
-            self.interface_name.as_ptr().cast(),
-            self.interface_name.as_bytes().len().try_into().unwrap(),
-            self.function_entries(),
-            Some(interface_init_handler),
-            null_mut(),
-        );
-
-        if let Some(bind_interface) = self.bind_interface {
-            bind_interface.bind(class_ce);
-        }
-
-        for interface in &self.extends {
-            let interface_ce = interface().as_ptr();
-            zend_class_implements(class_ce, 1, interface_ce);
-        }
-
-        class_ce
-    }
-
     unsafe fn function_entries(&self) -> *const zend_function_entry {
         let mut methods = self
             .method_entities
@@ -281,6 +259,31 @@ impl InterfaceEntity {
         methods.push(zeroed::<zend_function_entry>());
 
         Box::into_raw(methods.into_boxed_slice()).cast()
+    }
+}
+
+impl crate::modules::Registerer for InterfaceEntity {
+    fn register(&mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
+        unsafe {
+            let class_ce = phper_init_class_entry_ex(
+                self.interface_name.as_ptr().cast(),
+                self.interface_name.as_bytes().len(),
+                self.function_entries(),
+                Some(interface_init_handler),
+                null_mut(),
+            );
+
+            if let Some(bind_interface) = self.bind_interface {
+                bind_interface.bind(class_ce);
+            }
+
+            for interface in &self.extends {
+                let interface_ce = interface().as_ptr();
+                zend_class_implements(class_ce, 1, interface_ce);
+            }
+        };
+
+        Ok(())
     }
 }
 
