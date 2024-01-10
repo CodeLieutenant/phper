@@ -1,8 +1,8 @@
-use std::{any::Any, ffi::CString, marker::PhantomData, mem::zeroed, ptr::null_mut, rc::Rc};
+use std::{any::Any, marker::PhantomData, mem::zeroed, ptr::null_mut, rc::Rc};
 
 use phper_sys::{
     phper_get_create_object, phper_init_class_entry_ex, zend_class_entry, zend_class_implements,
-    zend_function_entry,
+    zend_function_entry, phper_register_class_entry_ex,
 };
 
 use crate::{
@@ -23,7 +23,7 @@ use super::{
 /// *It is a common practice for PHP extensions to use PHP objects to package
 /// third-party resources.*
 pub struct ClassEntity {
-    class_name: CString,
+    class: zend_class_entry,
     state_constructor: Rc<StateConstructor>,
     method_entities: Vec<MethodEntity>,
     property_entities: Vec<PropertyEntity>,
@@ -36,7 +36,7 @@ pub struct ClassEntity {
 
 impl ClassEntity {
     /// Construct a new `ClassEntity` with class name, do not own state.
-    pub fn new(class_name: impl Into<String>) -> Self {
+    pub fn new(class_name: impl AsRef<str>) -> Self {
         Self::new_with_state_constructor::<()>(class_name, || ())
     }
 }
@@ -44,7 +44,7 @@ impl ClassEntity {
 impl ClassEntity {
     /// Construct a new `ClassEntity` with class name and default state
     /// constructor.
-    pub fn new_with_default_state_constructor<T>(class_name: impl Into<String>) -> Self
+    pub fn new_with_default_state_constructor<T>(class_name: impl AsRef<str>) -> Self
     where
         T: Default + 'static,
     {
@@ -66,14 +66,17 @@ impl ClassEntity {
     /// Construct a new `ClassEntity` with class name and the constructor to
     /// build state.
     pub fn new_with_state_constructor<T>(
-        class_name: impl Into<String>,
+        class_name: impl AsRef<str>,
         state_constructor: impl Fn() -> T + 'static,
     ) -> Self
     where
         T: 'static,
     {
+        let class_name = class_name.as_ref();
+        let class_name_len = class_name.len();
+
         Self {
-            class_name: crate::utils::ensure_end_with_zero(class_name),
+            class: unsafe { phper_init_class_entry_ex(class_name.as_ptr().cast(), class_name_len) },
             state_constructor: Rc::new(move || {
                 let state = state_constructor();
                 let boxed = Box::new(state) as Box<dyn Any>;
@@ -92,7 +95,7 @@ impl ClassEntity {
     /// Add member method to class, with visibility and method handler.
     pub fn add_method<F, Z, E>(
         &mut self,
-        name: impl Into<String>,
+        name: impl AsRef<str>,
         vis: Visibility,
         handler: F,
     ) -> &mut MethodEntity
@@ -112,7 +115,7 @@ impl ClassEntity {
     /// Add static method to class, with visibility and method handler.
     pub fn add_static_method<F, Z, E>(
         &mut self,
-        name: impl Into<String>,
+        name: impl AsRef<str>,
         vis: Visibility,
         handler: F,
     ) -> &mut MethodEntity
@@ -130,7 +133,7 @@ impl ClassEntity {
     /// Add abstract method to class, with visibility (shouldn't be private).
     pub fn add_abstract_method(
         &mut self,
-        name: impl Into<String>,
+        name: impl AsRef<str>,
         vis: Visibility,
     ) -> &mut MethodEntity {
         let mut entity = MethodEntity::new(name, None, vis);
@@ -307,12 +310,8 @@ impl crate::modules::Registerer for ClassEntity {
                 .map(|entry| entry.as_ptr() as *mut _)
                 .unwrap_or(null_mut());
 
-            let class_ce = phper_init_class_entry_ex(
-                self.class_name.as_ptr().cast(),
-                self.class_name.as_bytes().len(),
-                self.function_entries(),
-                parent,
-            );
+            let class_ce =
+                phper_register_class_entry_ex(self.class, parent, self.function_entries());
 
             if let Some(bind_class) = self.bind_class {
                 bind_class.bind(class_ce);

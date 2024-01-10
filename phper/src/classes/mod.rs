@@ -185,9 +185,9 @@ pub struct InterfaceEntity {
 
 impl InterfaceEntity {
     /// Construct a new `InterfaceEntity` with interface name.
-    pub fn new(interface_name: impl Into<String>) -> Self {
+    pub fn new(interface_name: impl AsRef<str>) -> Self {
         Self {
-            interface_name: ensure_end_with_zero(interface_name.into()),
+            interface_name: ensure_end_with_zero(interface_name),
             method_entities: Vec::new(),
             extends: Vec::new(),
             bind_interface: None,
@@ -196,7 +196,7 @@ impl InterfaceEntity {
 
     /// Add member method to interface, with mandatory visibility public
     /// abstract.
-    pub fn add_method(&mut self, name: impl Into<String>) -> &mut MethodEntity {
+    pub fn add_method(&mut self, name: impl AsRef<str>) -> &mut MethodEntity {
         let mut entity = MethodEntity::new(name, None, Visibility::Public);
         entity.set_vis_abstract();
         self.method_entities.push(entity);
@@ -247,11 +247,10 @@ impl InterfaceEntity {
 impl crate::modules::Registerer for InterfaceEntity {
     fn register(&mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
         unsafe {
-            let class_ce = phper_init_class_entry_ex(
+            let class_ce = phper_init_interface_entry_ex(
                 self.interface_name.as_ptr().cast(),
                 self.interface_name.as_bytes().len(),
                 self.function_entries(),
-                null_mut(),
             );
 
             if let Some(bind_interface) = self.bind_interface {

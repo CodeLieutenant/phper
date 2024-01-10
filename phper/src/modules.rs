@@ -179,9 +179,9 @@ impl Registerer for Entities {
 impl Module {
     /// Construct the `Module` with base metadata.
     pub fn new(
-        name: impl Into<String>,
-        version: impl Into<String>,
-        author: impl Into<String>,
+        name: impl AsRef<str>,
+        version: impl AsRef<str>,
+        author: impl AsRef<str>,
     ) -> Self {
         Self {
             name: ensure_end_with_zero(name),
@@ -221,7 +221,7 @@ impl Module {
     /// Register function to module.
     pub fn add_function<F, Z, E>(
         &mut self,
-        name: impl Into<String>,
+        name: impl AsRef<str>,
         handler: F,
     ) -> &mut FunctionEntity
     where

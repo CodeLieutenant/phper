@@ -204,13 +204,17 @@ uint32_t phper_zend_object_gc_refcount(const zend_object *obj);
 // ==================================================
 // class apis:
 // ==================================================
+zend_class_entry phper_init_class_entry_ex(const char *class_name,
+                                           size_t class_name_len);
+
 zend_class_entry *
-phper_init_class_entry_ex(const char *class_name, size_t class_name_len,
-                          const zend_function_entry *functions,
-                          zend_class_entry *argument);
+phper_register_class_entry_ex(zend_class_entry ce, zend_class_entry *parent,
+                              const zend_function_entry *functions);
+
 zend_class_entry *
 phper_init_interface_entry_ex(const char *class_name, size_t class_name_len,
                               const zend_function_entry *functions);
+
 bool phper_instanceof_function(const zend_class_entry *instance_ce,
                                const zend_class_entry *ce);
 

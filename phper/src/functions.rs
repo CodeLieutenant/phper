@@ -177,7 +177,7 @@ pub struct FunctionEntity {
 
 impl FunctionEntity {
     #[inline]
-    pub(crate) fn new(name: impl Into<String>, handler: Rc<dyn Callable>) -> Self {
+    pub(crate) fn new(name: impl AsRef<str>, handler: Rc<dyn Callable>) -> Self {
         FunctionEntity {
             name: ensure_end_with_zero(name),
             handler,
@@ -211,7 +211,7 @@ pub struct MethodEntity {
 impl MethodEntity {
     #[inline]
     pub(crate) fn new(
-        name: impl Into<String>,
+        name: impl AsRef<str>,
         handler: Option<Rc<dyn Callable>>,
         visibility: Visibility,
     ) -> Self {
@@ -259,7 +259,7 @@ pub struct Argument {
 
 impl Argument {
     /// Indicate the argument is pass by value.
-    pub fn by_val(name: impl Into<String>) -> Self {
+    pub fn by_val(name: impl AsRef<str>) -> Self {
         let name = ensure_end_with_zero(name);
         Self {
             name,
@@ -269,7 +269,7 @@ impl Argument {
     }
 
     /// Indicate the argument is pass by reference.
-    pub fn by_ref(name: impl Into<String>) -> Self {
+    pub fn by_ref(name: impl AsRef<str>) -> Self {
         let name = ensure_end_with_zero(name);
         Self {
             name,
@@ -279,7 +279,7 @@ impl Argument {
     }
 
     /// Indicate the argument is pass by value and is optional.
-    pub fn by_val_optional(name: impl Into<String>) -> Self {
+    pub fn by_val_optional(name: impl AsRef<str>) -> Self {
         let name = ensure_end_with_zero(name);
         Self {
             name,
@@ -289,7 +289,7 @@ impl Argument {
     }
 
     /// Indicate the argument is pass by reference nad is optional.
-    pub fn by_ref_optional(name: impl Into<String>) -> Self {
+    pub fn by_ref_optional(name: impl AsRef<str>) -> Self {
         let name = ensure_end_with_zero(name);
         Self {
             name,
