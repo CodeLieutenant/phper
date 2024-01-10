@@ -50,11 +50,25 @@ uint32_t phper_zend_object_gc_refcount(const zend_object *obj) {
 zend_class_entry *
 phper_init_class_entry_ex(const char *class_name, size_t class_name_len,
                           const zend_function_entry *functions,
-                          phper_init_class_entry_handler handler,
-                          void *argument) {
-    zend_class_entry class_ce;
+                          zend_class_entry *parent) {
+    zend_class_entry class_ce = {0};
     INIT_CLASS_ENTRY_EX(class_ce, class_name, class_name_len, functions);
-    return handler(&class_ce, argument);
+
+    if (parent == NULL) {
+        return zend_register_internal_class(&class_ce);
+    }
+    return zend_register_internal_class_ex(&class_ce, parent);
+}
+
+zend_class_entry *
+phper_init_interface_entry_ex(const char *class_name, size_t class_name_len,
+                              const zend_function_entry *functions) {
+    zend_class_entry class_ce = {0};
+    INIT_CLASS_ENTRY_EX(class_ce, class_name, class_name_len, functions);
+
+    zend_class_entry *class_ptr;
+
+    return zend_register_internal_interface(&class_ce);
 }
 
 bool phper_instanceof_function(const zend_class_entry *instance_ce,

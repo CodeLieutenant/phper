@@ -64,17 +64,17 @@ where
     }
 }
 
-pub(crate) struct Method<F, Z, E, T>(F, PhantomData<(Z, E, T)>);
+pub(crate) struct Method<F, Z, E>(F, PhantomData<(Z, E)>);
 
-impl<F, Z, E, T> Method<F, Z, E, T> {
+impl<F, Z, E> Method<F, Z, E> {
     pub(crate) fn new(f: F) -> Self {
         Self(f, PhantomData)
     }
 }
 
-impl<F, Z, E, T: 'static> Callable for Method<F, Z, E, T>
+impl<F, Z, E> Callable for Method<F, Z, E>
 where
-    F: Fn(&mut StateObj<T>, &mut [ZVal]) -> Result<Z, E>,
+    F: Fn(&mut StateObj, &mut [ZVal]) -> Result<Z, E>,
     Z: Into<ZVal>,
     E: Throwable,
 {

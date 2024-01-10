@@ -35,7 +35,7 @@ thread_local! {
 }
 
 /// Register the class `HttpServer\HttpServer` by `ClassEntity`.
-pub fn make_server_class() -> ClassEntity<()> {
+pub fn make_server_class() -> ClassEntity {
     let mut class = ClassEntity::new(HTTP_SERVER_CLASS_NAME);
 
     // Register the server host field with public visibility.

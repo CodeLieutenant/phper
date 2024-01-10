@@ -151,13 +151,13 @@ pub fn integrate(module: &mut Module) {
 
     let mut class_b =
         ClassEntity::new_with_state_constructor("IntegrationTest\\Objects\\B", || 123456i64);
-    class_b.state_cloner(Clone::clone);
+    class_b.state_cloner::<i64>(Clone::clone);
     class_b.add_method("incr", Visibility::Public, |this, _| {
-        *this.as_mut_state() += 1;
+        *this.as_mut_state::<i64>() += 1;
         Ok::<_, Infallible>(())
     });
     class_b.add_method("get", Visibility::Public, |this, _| {
-        Ok::<_, Infallible>(*this.as_state())
+        Ok::<_, Infallible>(*this.as_state::<i64>())
     });
     module.add_class(class_b);
 }

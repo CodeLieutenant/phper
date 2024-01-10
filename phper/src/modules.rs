@@ -62,13 +62,11 @@ unsafe extern "C" fn module_startup(_type: c_int, module_number: c_int) -> c_int
     ini::register(take(&mut module.ini_entities), module_number);
 
     for mut entity in take(&mut module.entities).into_iter() {
-        entity.register(module_number).unwrap();
+        if let Err(err) =  entity.register(module_number) {
+            crate::output::log(crate::output::LogLevel::Error, format!("Failed to register: {err:?}"));
+            return ZEND_RESULT_CODE_FAILURE;
+        }
     }
-
-    // for class_entity in take(&mut module.class_entities).into_iter() {
-    //     let ce = class_entity.init();
-    //     class_entity.declare_properties(ce);
-    // }
 
     if let Some(f) = take(&mut module.module_init) {
         f(ModuleInfo {
@@ -157,9 +155,25 @@ pub struct Module {
     request_init: Option<&'static dyn Fn(ModuleInfo)>,
     request_shutdown: Option<&'static dyn Fn(ModuleInfo)>,
     function_entities: Vec<FunctionEntity>,
-    entities: Vec<Box<dyn Registerer>>,
+    entities: Vec<Entities>,
     ini_entities: Vec<zend_ini_entry_def>,
     infos: HashMap<CString, CString>,
+}
+
+pub(crate) enum Entities {
+    Constant(Constant),
+    Class(ClassEntity),
+    Interface(InterfaceEntity),
+}
+
+impl Registerer for Entities {
+    fn register(&mut self, module_number: i32) -> Result<(), Box<dyn std::error::Error>> {
+        match self {
+            Entities::Constant(con) => con.register(module_number),
+            Entities::Class(class) => class.register(module_number),
+            Entities::Interface(interface) => interface.register(module_number),
+        }
+    }
 }
 
 impl Module {
@@ -221,13 +235,13 @@ impl Module {
     }
 
     /// Register class to module.
-    pub fn add_class<T>(&mut self, class: ClassEntity<T>) {
-        self.entities.push(Box::new(class));
+    pub fn add_class(&mut self, class: ClassEntity) {
+        self.entities.push(Entities::Class(class));
     }
 
     /// Register interface to module.
     pub fn add_interface(&mut self, interface: InterfaceEntity) {
-        self.entities.push(Box::new(interface));
+        self.entities.push(Entities::Interface(interface));
     }
 
     /// Register constant to module.
@@ -238,7 +252,7 @@ impl Module {
         flags: Option<constants::Flags>,
     ) {
         self.entities
-            .push(Box::new(Constant::new(name, value, flags)));
+            .push(Entities::Constant(Constant::new(name, value, flags)));
     }
 
     /// Register ini configuration to module.

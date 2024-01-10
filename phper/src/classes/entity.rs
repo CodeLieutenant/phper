@@ -14,60 +14,64 @@ use crate::{
 };
 
 use super::{
-    class_init_handler, create_object, entry::ClassEntry, PropertyEntity, StateCloner,
-    StateConstructor, StaticStateClass, Visibility,
+    create_object, entry::ClassEntry, PropertyEntity, StateCloner, StateConstructor,
+    StaticStateClass, Visibility,
 };
 
 /// Builder for registering class.
 ///
-/// `<T>` means the type of holding state.
-///
 /// *It is a common practice for PHP extensions to use PHP objects to package
 /// third-party resources.*
-pub struct ClassEntity<T: 'static> {
+pub struct ClassEntity {
     class_name: CString,
     state_constructor: Rc<StateConstructor>,
     method_entities: Vec<MethodEntity>,
     property_entities: Vec<PropertyEntity>,
     parent: Option<Box<dyn Fn() -> &'static ClassEntry>>,
     interfaces: Vec<Box<dyn Fn() -> &'static ClassEntry>>,
-    bind_class: Option<&'static StaticStateClass<T>>,
+    bind_class: Option<&'static StaticStateClass>,
     state_cloner: Option<Rc<StateCloner>>,
-    _p: PhantomData<(*mut (), T)>,
+    _p: PhantomData<*mut ()>,
 }
 
-impl ClassEntity<()> {
+impl ClassEntity {
     /// Construct a new `ClassEntity` with class name, do not own state.
     pub fn new(class_name: impl Into<String>) -> Self {
-        Self::new_with_state_constructor(class_name, || ())
+        Self::new_with_state_constructor::<()>(class_name, || ())
     }
 }
 
-impl<T: Default + 'static> ClassEntity<T> {
+impl ClassEntity {
     /// Construct a new `ClassEntity` with class name and default state
     /// constructor.
-    pub fn new_with_default_state_constructor(class_name: impl Into<String>) -> Self {
-        Self::new_with_state_constructor(class_name, Default::default)
+    pub fn new_with_default_state_constructor<T>(class_name: impl Into<String>) -> Self
+    where
+        T: Default + 'static,
+    {
+        Self::new_with_state_constructor(class_name, T::default)
     }
 }
 
-pub trait Handler<T, Z, E> {
-    fn execute(&self, state: &mut StateObj<T>, args: &mut [ZVal]) -> Result<Z, E>;
+pub trait Handler<Z, E> {
+    fn execute(&self, state: &mut StateObj, args: &mut [ZVal]) -> Result<Z, E>;
 }
 
-impl<T, Z, E> Handler<T, Z, E> for dyn Fn(&mut StateObj<T>, &mut [ZVal]) -> Result<Z, E> + 'static {
-    fn execute(&self, state: &mut StateObj<T>, args: &mut [ZVal]) -> Result<Z, E> {
+impl<Z, E> Handler<Z, E> for dyn Fn(&mut StateObj, &mut [ZVal]) -> Result<Z, E> + 'static {
+    fn execute(&self, state: &mut StateObj, args: &mut [ZVal]) -> Result<Z, E> {
         self(state, args)
     }
 }
 
-impl<T: 'static> ClassEntity<T> {
+impl ClassEntity {
     /// Construct a new `ClassEntity` with class name and the constructor to
     /// build state.
-    pub fn new_with_state_constructor(
+    pub fn new_with_state_constructor<T>(
         class_name: impl Into<String>,
         state_constructor: impl Fn() -> T + 'static,
-    ) -> Self {
+    ) -> Self
+    where
+        T: 'static,
+    {
         Self {
             class_name: crate::utils::ensure_end_with_zero(class_name),
             state_constructor: Rc::new(move || {
@@ -79,9 +83,9 @@ impl<T: 'static> ClassEntity<T> {
             property_entities: Vec::new(),
             parent: None,
             interfaces: Vec::new(),
-            bind_class: None,
             state_cloner: None,
-            _p: PhantomData,
+            bind_class: None,
+            _p: Default::default(),
         }
     }
 
@@ -93,13 +97,13 @@ impl<T: 'static> ClassEntity<T> {
         handler: F,
     ) -> &mut MethodEntity
     where
-        F: Fn(&mut StateObj<T>, &mut [ZVal]) -> Result<Z, E> + 'static,
+        F: Fn(&mut StateObj, &mut [ZVal]) -> Result<Z, E> + 'static,
         Z: Into<ZVal> + 'static,
         E: Throwable + 'static,
     {
         self.method_entities.push(MethodEntity::new(
             name,
-            Some(Rc::new(Method::new(handler))),
+            Some(Rc::new(Method::<F, Z, E>::new(handler))),
             vis,
         ));
         self.method_entities.last_mut().unwrap()
@@ -211,7 +215,7 @@ impl<T: 'static> ClassEntity<T> {
     ///
     /// When the class registered, the [StaticStateClass] will be initialized,
     /// so you can use the [StaticStateClass] to new stateful object, etc.
-    pub fn bind(&mut self, cls: &'static StaticStateClass<T>) {
+    pub fn bind(&mut self, cls: &'static StaticStateClass) {
         self.bind_class = Some(cls);
     }
 
@@ -242,7 +246,7 @@ impl<T: 'static> ClassEntity<T> {
     ///     class
     /// }
     /// ```
-    pub fn state_cloner(&mut self, clone_fn: impl Fn(&T) -> T + 'static) {
+    pub fn state_cloner<T: 'static>(&mut self, clone_fn: impl Fn(&T) -> T + 'static) {
         self.state_cloner = Some(Rc::new(move |src| {
             let src = unsafe {
                 src.as_ref()
@@ -293,7 +297,7 @@ impl<T: 'static> ClassEntity<T> {
     }
 }
 
-impl<T: 'static> crate::modules::Registerer for ClassEntity<T> {
+impl crate::modules::Registerer for ClassEntity {
     fn register(&mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
         unsafe {
             let parent: *mut zend_class_entry = self
@@ -307,8 +311,7 @@ impl<T: 'static> crate::modules::Registerer for ClassEntity<T> {
                 self.class_name.as_ptr().cast(),
                 self.class_name.as_bytes().len(),
                 self.function_entries(),
-                Some(class_init_handler),
-                parent.cast(),
+                parent,
             );
 
             if let Some(bind_class) = self.bind_class {
