@@ -20,13 +20,11 @@ use crate::{
     objects::{StateObj, StateObject, ZObject},
     sys::*,
     types::Scalar,
-    utils::ensure_end_with_zero,
     values::ZVal,
 };
 use std::{
     any::Any,
     convert::TryInto,
-    ffi::CString,
     mem::{size_of, zeroed},
     os::raw::c_int,
     ptr::null_mut,
@@ -177,7 +175,7 @@ pub(crate) type StateCloner = dyn Fn(*const dyn Any) -> *mut dyn Any;
 
 /// Builder for registering interface.
 pub struct InterfaceEntity {
-    interface_name: CString,
+    interface: zend_class_entry,
     method_entities: Vec<MethodEntity>,
     extends: Vec<Box<dyn Fn() -> &'static ClassEntry>>,
     bind_interface: Option<&'static StaticInterface>,
@@ -186,8 +184,13 @@ pub struct InterfaceEntity {
 impl InterfaceEntity {
     /// Construct a new `InterfaceEntity` with interface name.
     pub fn new(interface_name: impl AsRef<str>) -> Self {
+        let interface_name = interface_name.as_ref();
+        let interface_name_len = interface_name.len();
+
         Self {
-            interface_name: ensure_end_with_zero(interface_name),
+            interface: unsafe {
+                phper_init_class_entry_ex(interface_name.as_ptr().cast(), interface_name_len)
+            },
             method_entities: Vec::new(),
             extends: Vec::new(),
             bind_interface: None,
@@ -247,11 +250,8 @@ impl InterfaceEntity {
 impl crate::modules::Registerer for InterfaceEntity {
     fn register(&mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
         unsafe {
-            let class_ce = phper_init_interface_entry_ex(
-                self.interface_name.as_ptr().cast(),
-                self.interface_name.as_bytes().len(),
-                self.function_entries(),
-            );
+            let class_ce =
+                phper_register_interface_entry_ex(&mut self.interface, self.function_entries());
 
             if let Some(bind_interface) = self.bind_interface {
                 bind_interface.bind(class_ce);

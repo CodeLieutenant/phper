@@ -1,8 +1,8 @@
 use std::{any::Any, marker::PhantomData, mem::zeroed, ptr::null_mut, rc::Rc};
 
 use phper_sys::{
-    phper_get_create_object, phper_init_class_entry_ex, zend_class_entry, zend_class_implements,
-    zend_function_entry, phper_register_class_entry_ex,
+    phper_get_create_object, phper_init_class_entry_ex, phper_register_class_entry_ex,
+    zend_class_entry, zend_class_implements, zend_function_entry,
 };
 
 use crate::{
@@ -311,7 +311,7 @@ impl crate::modules::Registerer for ClassEntity {
                 .unwrap_or(null_mut());
 
             let class_ce =
-                phper_register_class_entry_ex(self.class, parent, self.function_entries());
+                phper_register_class_entry_ex(&mut self.class, parent, self.function_entries());
 
             if let Some(bind_class) = self.bind_class {
                 bind_class.bind(class_ce);
