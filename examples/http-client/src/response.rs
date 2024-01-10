@@ -19,16 +19,16 @@ use std::mem::take;
 
 pub const RESPONSE_CLASS_NAME: &str = "HttpClient\\Response";
 
-pub static RESPONSE_CLASS: StaticStateClass<Option<Response>> = StaticStateClass::null();
+pub static RESPONSE_CLASS: StaticStateClass = StaticStateClass::null();
 
-pub fn make_response_class() -> ClassEntity<Option<Response>> {
+pub fn make_response_class() -> ClassEntity {
     let mut class =
-        ClassEntity::<Option<Response>>::new_with_default_state_constructor(RESPONSE_CLASS_NAME);
+        ClassEntity::new_with_default_state_constructor::<Option<Response>>(RESPONSE_CLASS_NAME);
 
     class.bind(&RESPONSE_CLASS);
 
     class.add_method("body", Visibility::Public, |this, _arguments| {
-        let response = take(this.as_mut_state());
+        let response = take(this.as_mut_state::<Option<Response>>());
         let response = response.ok_or(HttpClientError::ResponseHadRead)?;
         let body = response.bytes().map_err(HttpClientError::Reqwest)?;
         Ok::<_, phper::Error>(body.to_vec())
@@ -36,7 +36,7 @@ pub fn make_response_class() -> ClassEntity<Option<Response>> {
 
     class.add_method("status", Visibility::Public, |this, _arguments| {
         let response =
-            this.as_state()
+            this.as_state::<Option<Response>>()
                 .as_ref()
                 .ok_or_else(|| HttpClientError::ResponseAfterRead {
                     method_name: "status".to_owned(),
@@ -47,7 +47,7 @@ pub fn make_response_class() -> ClassEntity<Option<Response>> {
 
     class.add_method("headers", Visibility::Public, |this, _arguments| {
         let response =
-            this.as_state()
+            this.as_state::<Option<Response>>()
                 .as_ref()
                 .ok_or_else(|| HttpClientError::ResponseAfterRead {
                     method_name: "headers".to_owned(),

@@ -10,72 +10,58 @@
 
 //! Apis relate to [zend_constant](crate::sys::zend_constant).
 
-use crate::{sys::*, types::Scalar};
-use std::ffi::{c_char, c_int};
+use crate::modules::Registerer;
+use crate::sys::*;
+use crate::values::ZVal;
+use bitflags::bitflags;
 
-pub(crate) struct Constant {
-    name: String,
-    value: Scalar,
+pub struct Constant {
+    constant: zend_constant,
+    flags: i32,
+}
+
+// #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct Flags(u32);
+
+impl Default for Flags {
+    fn default() -> Self {
+        Self::Cs | Self::Persistent
+    }
+}
+
+bitflags! {
+    impl Flags: u32 {
+        const Cs = CONST_CS;
+        const Persistent = CONST_PERSISTENT;
+        const NoFileCache = CONST_NO_FILE_CACHE;
+        const Deprecated = CONST_DEPRECATED;
+        const Owned = CONST_OWNED;
+    }
 }
 
 impl Constant {
-    pub fn new(name: impl Into<String>, value: impl Into<Scalar>) -> Self {
+    pub fn new(name: impl AsRef<str>, value: impl Into<ZVal>, flags: Option<Flags>) -> Self {
+        let name = name.as_ref();
+        let length = name.len();
+        let ptr = name.as_bytes().as_ptr() as *const i8;
+        let flags = flags.unwrap_or(Flags::Cs | Flags::Persistent).bits() as i32;
         Self {
-            name: name.into(),
-            value: value.into(),
+            constant: unsafe { phper_create_constant(ptr, length, value.into().inner, flags) },
+            flags,
         }
     }
+}
 
-    pub(crate) fn register(&self, module_number: c_int) {
-        let name_ptr = self.name.as_ptr() as *const c_char;
-        let name_len = self.name.len();
-        let flags = (CONST_PERSISTENT | CONST_CS) as c_int;
+impl Registerer for Constant {
+    fn register(&mut self, module_number: i32) -> Result<(), Box<dyn std::error::Error>> {
+        let result =
+            unsafe { phper_register_constant(&mut self.constant, self.flags, module_number) };
 
-        unsafe {
-            match &self.value {
-                Scalar::Null => {
-                    zend_register_null_constant(name_ptr, name_len, flags, module_number)
-                }
-                Scalar::Bool(b) => zend_register_bool_constant(
-                    name_ptr,
-                    name_len,
-                    *b as zend_bool,
-                    flags,
-                    module_number,
-                ),
-                Scalar::I64(i) => zend_register_long_constant(
-                    name_ptr,
-                    name_len,
-                    *i as zend_long,
-                    flags,
-                    module_number,
-                ),
-                Scalar::F64(f) => {
-                    zend_register_double_constant(name_ptr, name_len, *f, flags, module_number)
-                }
-                Scalar::String(s) => {
-                    let s_ptr = s.as_ptr() as *mut u8;
-                    zend_register_stringl_constant(
-                        name_ptr,
-                        name_len,
-                        s_ptr.cast(),
-                        s.len(),
-                        flags,
-                        module_number,
-                    )
-                }
-                Scalar::Bytes(s) => {
-                    let s_ptr = s.as_ptr() as *mut u8;
-                    zend_register_stringl_constant(
-                        name_ptr,
-                        name_len,
-                        s_ptr.cast(),
-                        s.len(),
-                        flags,
-                        module_number,
-                    )
-                }
-            }
+        if result == ZEND_RESULT_CODE_SUCCESS {
+            Ok(())
+        } else {
+            Err("Failed to register new ZEND constant".into())
         }
     }
 }

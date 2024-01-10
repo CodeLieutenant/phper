@@ -21,12 +21,13 @@ use phper::{
 
 pub const HTTP_RESPONSE_CLASS_NAME: &str = "HttpServer\\HttpResponse";
 
-pub static HTTP_RESPONSE_CLASS: StaticStateClass<Response<Body>> = StaticStateClass::null();
+pub static HTTP_RESPONSE_CLASS: StaticStateClass = StaticStateClass::null();
 
 /// Register the class `HttpServer\HttpResponse` by `ClassEntity`, with the
 /// inner state `Response<Body>`.
-pub fn make_response_class() -> ClassEntity<Response<Body>> {
-    let mut class = ClassEntity::new_with_default_state_constructor(HTTP_RESPONSE_CLASS_NAME);
+pub fn make_response_class() -> ClassEntity {
+    let mut class =
+        ClassEntity::new_with_default_state_constructor::<Response<Body>>(HTTP_RESPONSE_CLASS_NAME);
 
     // The state class will be initialized after class registered.
     class.bind(&HTTP_RESPONSE_CLASS);
@@ -64,6 +65,6 @@ pub fn make_response_class() -> ClassEntity<Response<Body>> {
 }
 
 /// Instantiate the object with class `HttpServer\HttpResponse`.
-pub fn new_response_object() -> phper::Result<StateObject<Response<Body>>> {
+pub fn new_response_object() -> phper::Result<StateObject> {
     HTTP_RESPONSE_CLASS.new_object([])
 }

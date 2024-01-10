@@ -20,14 +20,11 @@ use crate::{
     objects::{StateObj, StateObject, ZObject},
     sys::*,
     types::Scalar,
-    utils::ensure_end_with_zero,
     values::ZVal,
 };
 use std::{
     any::Any,
     convert::TryInto,
-    ffi::{c_void, CString},
-    marker::PhantomData,
     mem::{size_of, zeroed},
     os::raw::c_int,
     ptr::null_mut,
@@ -79,18 +76,16 @@ fn find_global_class_entry_ptr(name: impl AsRef<str>) -> *mut zend_class_entry {
 /// }
 /// ```
 #[repr(transparent)]
-pub struct StaticStateClass<T> {
+pub struct StaticStateClass {
     inner: AtomicPtr<zend_class_entry>,
-    _p: PhantomData<T>,
 }
 
-impl<T> StaticStateClass<T> {
+impl StaticStateClass {
     /// Create empty [StaticStateClass], with null
     /// [zend_class_entry].
     pub const fn null() -> Self {
         Self {
             inner: AtomicPtr::new(null_mut()),
-            _p: PhantomData,
         }
     }
 
@@ -107,28 +102,25 @@ impl<T> StaticStateClass<T> {
     ///
     /// If the `__construct` is private, or protected and the called scope isn't
     /// parent class, it will throw PHP Error.
-    pub fn new_object(
-        &'static self,
-        arguments: impl AsMut<[ZVal]>,
-    ) -> crate::Result<StateObject<T>> {
+    pub fn new_object(&'static self, arguments: impl AsMut<[ZVal]>) -> crate::Result<StateObject> {
         self.as_class_entry()
             .new_object(arguments)
             .map(ZObject::into_raw)
-            .map(StateObject::<T>::from_raw_object)
+            .map(StateObject::from_raw_object)
     }
 
     /// Create the object from class, without calling `__construct`.
     ///
     /// **Be careful when `__construct` is necessary.**
-    pub fn init_object(&'static self) -> crate::Result<StateObject<T>> {
+    pub fn init_object(&'static self) -> crate::Result<StateObject> {
         self.as_class_entry()
             .init_object()
             .map(ZObject::into_raw)
-            .map(StateObject::<T>::from_raw_object)
+            .map(StateObject::from_raw_object)
     }
 }
 
-unsafe impl<T> Sync for StaticStateClass<T> {}
+unsafe impl Sync for StaticStateClass {}
 
 /// The [StaticInterface]  holds
 /// [zend_class_entry], always as the static
@@ -181,21 +173,9 @@ pub(crate) type StateConstructor = dyn Fn() -> *mut dyn Any;
 
 pub(crate) type StateCloner = dyn Fn(*const dyn Any) -> *mut dyn Any;
 
-unsafe extern "C" fn class_init_handler(
-    class_ce: *mut zend_class_entry,
-    argument: *mut c_void,
-) -> *mut zend_class_entry {
-    let parent = argument as *mut zend_class_entry;
-    if parent.is_null() {
-        zend_register_internal_class(class_ce)
-    } else {
-        zend_register_internal_class_ex(class_ce, parent)
-    }
-}
-
 /// Builder for registering interface.
 pub struct InterfaceEntity {
-    interface_name: CString,
+    interface: zend_class_entry,
     method_entities: Vec<MethodEntity>,
     extends: Vec<Box<dyn Fn() -> &'static ClassEntry>>,
     bind_interface: Option<&'static StaticInterface>,
@@ -203,9 +183,14 @@ pub struct InterfaceEntity {
 
 impl InterfaceEntity {
     /// Construct a new `InterfaceEntity` with interface name.
-    pub fn new(interface_name: impl Into<String>) -> Self {
+    pub fn new(interface_name: impl AsRef<str>) -> Self {
+        let interface_name = interface_name.as_ref();
+        let interface_name_len = interface_name.len();
+
         Self {
-            interface_name: ensure_end_with_zero(interface_name.into()),
+            interface: unsafe {
+                phper_init_class_entry_ex(interface_name.as_ptr().cast(), interface_name_len)
+            },
             method_entities: Vec::new(),
             extends: Vec::new(),
             bind_interface: None,
@@ -214,7 +199,7 @@ impl InterfaceEntity {
 
     /// Add member method to interface, with mandatory visibility public
     /// abstract.
-    pub fn add_method(&mut self, name: impl Into<String>) -> &mut MethodEntity {
+    pub fn add_method(&mut self, name: impl AsRef<str>) -> &mut MethodEntity {
         let mut entity = MethodEntity::new(name, None, Visibility::Public);
         entity.set_vis_abstract();
         self.method_entities.push(entity);
@@ -249,28 +234,6 @@ impl InterfaceEntity {
         self.bind_interface = Some(i);
     }
 
-    #[allow(clippy::useless_conversion)]
-    pub(crate) unsafe fn init(&self) -> *mut zend_class_entry {
-        let class_ce = phper_init_class_entry_ex(
-            self.interface_name.as_ptr().cast(),
-            self.interface_name.as_bytes().len().try_into().unwrap(),
-            self.function_entries(),
-            Some(interface_init_handler),
-            null_mut(),
-        );
-
-        if let Some(bind_interface) = self.bind_interface {
-            bind_interface.bind(class_ce);
-        }
-
-        for interface in &self.extends {
-            let interface_ce = interface().as_ptr();
-            zend_class_implements(class_ce, 1, interface_ce);
-        }
-
-        class_ce
-    }
-
     unsafe fn function_entries(&self) -> *const zend_function_entry {
         let mut methods = self
             .method_entities
@@ -284,11 +247,24 @@ impl InterfaceEntity {
     }
 }
 
-unsafe extern "C" fn interface_init_handler(
-    class_ce: *mut zend_class_entry,
-    _argument: *mut c_void,
-) -> *mut zend_class_entry {
-    zend_register_internal_interface(class_ce)
+impl crate::modules::Registerer for InterfaceEntity {
+    fn register(&mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
+        unsafe {
+            let class_ce =
+                phper_register_interface_entry_ex(&mut self.interface, self.function_entries());
+
+            if let Some(bind_interface) = self.bind_interface {
+                bind_interface.bind(class_ce);
+            }
+
+            for interface in &self.extends {
+                let interface_ce = interface().as_ptr();
+                zend_class_implements(class_ce, 1, interface_ce);
+            }
+        };
+
+        Ok(())
+    }
 }
 
 /// Builder for declare class property.
@@ -379,8 +355,8 @@ pub(crate) type RawVisibility = u32;
 
 unsafe extern "C" fn create_object(ce: *mut zend_class_entry) -> *mut zend_object {
     // Alloc more memory size to store state data.
-    let state_object = phper_zend_object_alloc(size_of::<StateObj<()>>(), ce);
-    let state_object = StateObj::<()>::from_mut_ptr(state_object);
+    let state_object = phper_zend_object_alloc(size_of::<StateObj>(), ce);
+    let state_object = StateObj::from_mut_ptr(state_object);
 
     // Find the hack elements hidden behind null builtin_function.
     let mut func_ptr = (*ce).info.internal.builtin_functions;
@@ -407,7 +383,7 @@ unsafe extern "C" fn create_object(ce: *mut zend_class_entry) -> *mut zend_objec
 
     // Set handlers
     let mut handlers = Box::new(std_object_handlers);
-    handlers.offset = StateObj::<()>::offset() as c_int;
+    handlers.offset = StateObj::offset() as c_int;
     handlers.free_obj = Some(free_object);
     handlers.clone_obj = has_state_cloner.then_some(clone_object);
     (*object).handlers = Box::into_raw(handlers);
@@ -427,8 +403,8 @@ unsafe fn clone_object_common(object: *mut zend_object) -> *mut zend_object {
     let ce = (*object).ce;
 
     // Alloc more memory size to store state data.
-    let new_state_object = phper_zend_object_alloc(size_of::<StateObj<()>>(), ce);
-    let new_state_object = StateObj::<()>::from_mut_ptr(new_state_object);
+    let new_state_object = phper_zend_object_alloc(size_of::<StateObj>(), ce);
+    let new_state_object = StateObj::from_mut_ptr(new_state_object);
 
     // Find the hack elements hidden behind null builtin_function.
     let mut func_ptr = (*(*object).ce).info.internal.builtin_functions;
@@ -451,7 +427,7 @@ unsafe fn clone_object_common(object: *mut zend_object) -> *mut zend_object {
     (*new_object).handlers = (*object).handlers;
 
     // Call the state cloner and store the state.
-    let state_object = StateObj::<()>::from_mut_object_ptr(object);
+    let state_object = StateObj::from_mut_object_ptr(object);
     let data = (state_cloner)(*state_object.as_mut_any_state());
     *new_state_object.as_mut_any_state() = data;
 
@@ -459,7 +435,7 @@ unsafe fn clone_object_common(object: *mut zend_object) -> *mut zend_object {
 }
 
 unsafe extern "C" fn free_object(object: *mut zend_object) {
-    let state_object = StateObj::<()>::from_mut_object_ptr(object);
+    let state_object = StateObj::from_mut_object_ptr(object);
 
     // Drop the state.
     state_object.drop_state();

@@ -28,7 +28,7 @@ pub enum LogLevel {
 }
 
 /// log message with level.
-pub fn log(level: LogLevel, message: impl Into<String>) {
+pub fn log(level: LogLevel, message: impl AsRef<str>) {
     let message = ensure_end_with_zero(message);
     unsafe {
         php_error_docref1(
@@ -41,13 +41,12 @@ pub fn log(level: LogLevel, message: impl Into<String>) {
 }
 
 /// Just like PHP `echo`.
-#[allow(clippy::useless_conversion)]
-pub fn echo(message: impl Into<String>) {
+pub fn echo(message: impl AsRef<str>) {
     let message = ensure_end_with_zero(message);
     unsafe {
         zend_write.expect("function zend_write can't be null")(
             message.as_ptr().cast(),
-            message.as_bytes().len().try_into().unwrap(),
+            message.as_bytes().len(),
         );
     }
 }

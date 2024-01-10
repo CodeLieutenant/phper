@@ -11,13 +11,14 @@
 #![warn(rust_2018_idioms)]
 #![warn(clippy::dbg_macro, clippy::print_stdout)]
 #![doc = include_str!("../README.md")]
+// #![feature(unboxed_closures)]
 
 #[macro_use]
 mod macros;
 
 pub mod arrays;
 pub mod classes;
-pub(crate) mod constants;
+pub mod constants;
 pub mod errors;
 pub mod functions;
 pub mod ini;

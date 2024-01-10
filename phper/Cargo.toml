@@ -29,6 +29,7 @@ phper-alloc = { workspace = true }
 phper-macros = { workspace = true }
 phper-sys = { workspace = true }
 thiserror = "1.0.43"
+bitflags = { version = "2.4.1" }
 
 [build-dependencies]
 phper-build = { workspace = true }

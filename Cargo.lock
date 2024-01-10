@@ -823,6 +823,7 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 name = "phper"
 version = "0.13.0"
 dependencies = [
+ "bitflags 2.4.1",
  "derive_more",
  "indexmap",
  "once_cell",

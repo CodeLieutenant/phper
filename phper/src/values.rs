@@ -180,7 +180,7 @@ impl ExecuteData {
 /// Wrapper of [zval].
 #[repr(transparent)]
 pub struct ZVal {
-    inner: zval,
+    pub(crate) inner: zval,
     _p: PhantomData<*mut ()>,
 }
 
@@ -798,8 +798,8 @@ impl From<ZObject> for ZVal {
     }
 }
 
-impl<T> From<StateObject<T>> for ZVal {
-    fn from(obj: StateObject<T>) -> Self {
+impl From<StateObject> for ZVal {
+    fn from(obj: StateObject) -> Self {
         ZVal::from(obj.into_z_object())
     }
 }

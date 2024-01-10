@@ -1,8 +1,8 @@
-use std::{any::Any, ffi::CString, marker::PhantomData, mem::zeroed, ptr::null_mut, rc::Rc};
+use std::{any::Any, marker::PhantomData, mem::zeroed, ptr::null_mut, rc::Rc};
 
 use phper_sys::{
-    phper_get_create_object, phper_init_class_entry_ex, zend_class_entry, zend_class_implements,
-    zend_function_entry,
+    phper_get_create_object, phper_init_class_entry_ex, phper_register_class_entry_ex,
+    zend_class_entry, zend_class_implements, zend_function_entry,
 };
 
 use crate::{
@@ -14,62 +14,69 @@ use crate::{
 };
 
 use super::{
-    class_init_handler, create_object, entry::ClassEntry, PropertyEntity, StateCloner,
-    StateConstructor, StaticStateClass, Visibility,
+    create_object, entry::ClassEntry, PropertyEntity, StateCloner, StateConstructor,
+    StaticStateClass, Visibility,
 };
 
 /// Builder for registering class.
 ///
-/// `<T>` means the type of holding state.
-///
 /// *It is a common practice for PHP extensions to use PHP objects to package
 /// third-party resources.*
-pub struct ClassEntity<T: 'static> {
-    class_name: CString,
+pub struct ClassEntity {
+    class: zend_class_entry,
     state_constructor: Rc<StateConstructor>,
     method_entities: Vec<MethodEntity>,
     property_entities: Vec<PropertyEntity>,
     parent: Option<Box<dyn Fn() -> &'static ClassEntry>>,
     interfaces: Vec<Box<dyn Fn() -> &'static ClassEntry>>,
-    bind_class: Option<&'static StaticStateClass<T>>,
+    bind_class: Option<&'static StaticStateClass>,
     state_cloner: Option<Rc<StateCloner>>,
-    _p: PhantomData<(*mut (), T)>,
+    _p: PhantomData<*mut ()>,
 }
 
-impl ClassEntity<()> {
+impl ClassEntity {
     /// Construct a new `ClassEntity` with class name, do not own state.
-    pub fn new(class_name: impl Into<String>) -> Self {
-        Self::new_with_state_constructor(class_name, || ())
+    pub fn new(class_name: impl AsRef<str>) -> Self {
+        Self::new_with_state_constructor::<()>(class_name, || ())
     }
 }
 
-impl<T: Default + 'static> ClassEntity<T> {
+impl ClassEntity {
     /// Construct a new `ClassEntity` with class name and default state
     /// constructor.
-    pub fn new_with_default_state_constructor(class_name: impl Into<String>) -> Self {
-        Self::new_with_state_constructor(class_name, Default::default)
+    pub fn new_with_default_state_constructor<T>(class_name: impl AsRef<str>) -> Self
+    where
+        T: Default + 'static,
+    {
+        Self::new_with_state_constructor(class_name, T::default)
     }
 }
 
-pub trait Handler<T, Z, E> {
-    fn execute(&self, state: &mut StateObj<T>, args: &mut [ZVal]) -> Result<Z, E>;
+pub trait Handler<Z, E> {
+    fn execute(&self, state: &mut StateObj, args: &mut [ZVal]) -> Result<Z, E>;
 }
 
-impl<T, Z, E> Handler<T, Z, E> for dyn Fn(&mut StateObj<T>, &mut [ZVal]) -> Result<Z, E> + 'static {
-    fn execute(&self, state: &mut StateObj<T>, args: &mut [ZVal]) -> Result<Z, E> {
+impl<Z, E> Handler<Z, E> for dyn Fn(&mut StateObj, &mut [ZVal]) -> Result<Z, E> + 'static {
+    fn execute(&self, state: &mut StateObj, args: &mut [ZVal]) -> Result<Z, E> {
         self(state, args)
     }
 }
 
-impl<T: 'static> ClassEntity<T> {
+impl ClassEntity {
     /// Construct a new `ClassEntity` with class name and the constructor to
     /// build state.
-    pub fn new_with_state_constructor(
-        class_name: impl Into<String>,
+    pub fn new_with_state_constructor<T>(
+        class_name: impl AsRef<str>,
         state_constructor: impl Fn() -> T + 'static,
-    ) -> Self {
+    ) -> Self
+    where
+        T: 'static,
+    {
+        let class_name = class_name.as_ref();
+        let class_name_len = class_name.len();
+
         Self {
-            class_name: crate::utils::ensure_end_with_zero(class_name),
+            class: unsafe { phper_init_class_entry_ex(class_name.as_ptr().cast(), class_name_len) },
             state_constructor: Rc::new(move || {
                 let state = state_constructor();
                 let boxed = Box::new(state) as Box<dyn Any>;
@@ -79,27 +86,27 @@ impl<T: 'static> ClassEntity<T> {
             property_entities: Vec::new(),
             parent: None,
             interfaces: Vec::new(),
-            bind_class: None,
             state_cloner: None,
-            _p: PhantomData,
+            bind_class: None,
+            _p: Default::default(),
         }
     }
 
     /// Add member method to class, with visibility and method handler.
     pub fn add_method<F, Z, E>(
         &mut self,
-        name: impl Into<String>,
+        name: impl AsRef<str>,
         vis: Visibility,
         handler: F,
     ) -> &mut MethodEntity
     where
-        F: Fn(&mut StateObj<T>, &mut [ZVal]) -> Result<Z, E> + 'static,
+        F: Fn(&mut StateObj, &mut [ZVal]) -> Result<Z, E> + 'static,
         Z: Into<ZVal> + 'static,
         E: Throwable + 'static,
     {
         self.method_entities.push(MethodEntity::new(
             name,
-            Some(Rc::new(Method::new(handler))),
+            Some(Rc::new(Method::<F, Z, E>::new(handler))),
             vis,
         ));
         self.method_entities.last_mut().unwrap()
@@ -108,7 +115,7 @@ impl<T: 'static> ClassEntity<T> {
     /// Add static method to class, with visibility and method handler.
     pub fn add_static_method<F, Z, E>(
         &mut self,
-        name: impl Into<String>,
+        name: impl AsRef<str>,
         vis: Visibility,
         handler: F,
     ) -> &mut MethodEntity
@@ -126,7 +133,7 @@ impl<T: 'static> ClassEntity<T> {
     /// Add abstract method to class, with visibility (shouldn't be private).
     pub fn add_abstract_method(
         &mut self,
-        name: impl Into<String>,
+        name: impl AsRef<str>,
         vis: Visibility,
     ) -> &mut MethodEntity {
         let mut entity = MethodEntity::new(name, None, vis);
@@ -211,7 +218,7 @@ impl<T: 'static> ClassEntity<T> {
     ///
     /// When the class registered, the [StaticStateClass] will be initialized,
     /// so you can use the [StaticStateClass] to new stateful object, etc.
-    pub fn bind(&mut self, cls: &'static StaticStateClass<T>) {
+    pub fn bind(&mut self, cls: &'static StaticStateClass) {
         self.bind_class = Some(cls);
     }
 
@@ -242,7 +249,7 @@ impl<T: 'static> ClassEntity<T> {
     ///     class
     /// }
     /// ```
-    pub fn state_cloner(&mut self, clone_fn: impl Fn(&T) -> T + 'static) {
+    pub fn state_cloner<T: 'static>(&mut self, clone_fn: impl Fn(&T) -> T + 'static) {
         self.state_cloner = Some(Rc::new(move |src| {
             let src = unsafe {
                 src.as_ref()
@@ -254,43 +261,6 @@ impl<T: 'static> ClassEntity<T> {
             let boxed = Box::new(dest) as Box<dyn Any>;
             Box::into_raw(boxed)
         }));
-    }
-
-    #[allow(clippy::useless_conversion)]
-    pub(crate) unsafe fn init(&self) -> *mut zend_class_entry {
-        let parent: *mut zend_class_entry = self
-            .parent
-            .as_ref()
-            .map(|parent| parent())
-            .map(|entry| entry.as_ptr() as *mut _)
-            .unwrap_or(null_mut());
-
-        let class_ce = phper_init_class_entry_ex(
-            self.class_name.as_ptr().cast(),
-            self.class_name.as_bytes().len().try_into().unwrap(),
-            self.function_entries(),
-            Some(class_init_handler),
-            parent.cast(),
-        );
-
-        if let Some(bind_class) = self.bind_class {
-            bind_class.bind(class_ce);
-        }
-
-        for interface in &self.interfaces {
-            let interface_ce = interface().as_ptr();
-            zend_class_implements(class_ce, 1, interface_ce);
-        }
-
-        *phper_get_create_object(class_ce) = Some(create_object);
-
-        class_ce
-    }
-
-    pub(crate) unsafe fn declare_properties(&self, ce: *mut zend_class_entry) {
-        for property in &self.property_entities {
-            property.declare(ce);
-        }
     }
 
     unsafe fn function_entries(&self) -> *const zend_function_entry {
@@ -327,5 +297,38 @@ impl<T: 'static> ClassEntity<T> {
             ptr.write(state_constructor);
         }
         entry
+    }
+}
+
+impl crate::modules::Registerer for ClassEntity {
+    fn register(&mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
+        unsafe {
+            let parent: *mut zend_class_entry = self
+                .parent
+                .as_ref()
+                .map(|parent| parent())
+                .map(|entry| entry.as_ptr() as *mut _)
+                .unwrap_or(null_mut());
+
+            let class_ce =
+                phper_register_class_entry_ex(&mut self.class, parent, self.function_entries());
+
+            if let Some(bind_class) = self.bind_class {
+                bind_class.bind(class_ce);
+            }
+
+            for interface in &self.interfaces {
+                let interface_ce = interface().as_ptr();
+                zend_class_implements(class_ce, 1, interface_ce);
+            }
+
+            *phper_get_create_object(class_ce) = Some(create_object);
+
+            for property in &self.property_entities {
+                property.declare(class_ce);
+            }
+        }
+
+        Ok(())
     }
 }
