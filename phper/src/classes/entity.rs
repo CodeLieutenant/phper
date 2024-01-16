@@ -1,7 +1,7 @@
 use std::{any::Any, marker::PhantomData, mem::zeroed, ptr::null_mut, rc::Rc};
 
 use phper_sys::{
-    phper_get_create_object, phper_init_class_entry_ex, phper_register_class_entry_ex,
+    phper_init_class_entry_ex, phper_register_class_entry_ex,
     zend_class_entry, zend_class_implements, zend_function_entry,
 };
 
@@ -322,7 +322,7 @@ impl crate::modules::Registerer for ClassEntity {
                 zend_class_implements(class_ce, 1, interface_ce);
             }
 
-            *phper_get_create_object(class_ce) = Some(create_object);
+            (*class_ce).__bindgen_anon_2.create_object = Some(create_object);
 
             for property in &self.property_entities {
                 property.declare(class_ce);

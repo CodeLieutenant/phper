@@ -168,13 +168,7 @@ impl ExecuteData {
         }
     }
 
-    /// Gets mutable parameter by index.
-    pub fn get_mut_parameter(&mut self, index: usize) -> &mut ZVal {
-        unsafe {
-            let val = phper_zend_call_var_num(self.as_mut_ptr(), index.try_into().unwrap());
-            ZVal::from_mut_ptr(val)
-        }
-    }
+
 }
 
 /// Wrapper of [zval].
