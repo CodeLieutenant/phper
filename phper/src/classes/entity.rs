@@ -1,8 +1,8 @@
 use std::{any::Any, marker::PhantomData, mem::zeroed, ptr::null_mut, rc::Rc};
 
 use phper_sys::{
-    phper_init_class_entry_ex, phper_register_class_entry_ex,
-    zend_class_entry, zend_class_implements, zend_function_entry,
+    phper_init_class_entry_ex, phper_register_class_entry_ex, zend_class_entry,
+    zend_class_implements, zend_function_entry,
 };
 
 use crate::{

@@ -62,8 +62,11 @@ unsafe extern "C" fn module_startup(_type: c_int, module_number: c_int) -> c_int
     ini::register(take(&mut module.ini_entities), module_number);
 
     for mut entity in take(&mut module.entities).into_iter() {
-        if let Err(err) =  entity.register(module_number) {
-            crate::output::log(crate::output::LogLevel::Error, format!("Failed to register: {err:?}"));
+        if let Err(err) = entity.register(module_number) {
+            crate::output::log(
+                crate::output::LogLevel::Error,
+                format!("Failed to register: {err:?}"),
+            );
             return ZEND_RESULT_CODE_FAILURE;
         }
     }
@@ -178,11 +181,7 @@ impl Registerer for Entities {
 
 impl Module {
     /// Construct the `Module` with base metadata.
-    pub fn new(
-        name: impl AsRef<str>,
-        version: impl AsRef<str>,
-        author: impl AsRef<str>,
-    ) -> Self {
+    pub fn new(name: impl AsRef<str>, version: impl AsRef<str>, author: impl AsRef<str>) -> Self {
         Self {
             name: ensure_end_with_zero(name),
             version: ensure_end_with_zero(version),

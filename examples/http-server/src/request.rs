@@ -34,11 +34,10 @@ pub fn make_request_class() -> ClassEntity {
 
     // Register the constructor method with public visibility, initialize the
     // headers with empty array.
-    class
-        .add_method("__construct", Visibility::Public, |this, _arguments| {
-            this.set_property("headers", ZArray::new());
-            Ok::<_, Infallible>(())
-        });
+    class.add_method("__construct", Visibility::Public, |this, _arguments| {
+        this.set_property("headers", ZArray::new());
+        Ok::<_, Infallible>(())
+    });
 
     class
 }

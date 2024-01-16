@@ -167,8 +167,6 @@ impl ExecuteData {
             ZVal::from_ptr(val)
         }
     }
-
-
 }
 
 /// Wrapper of [zval].
