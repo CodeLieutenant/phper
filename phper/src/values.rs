@@ -135,7 +135,7 @@ impl ExecuteData {
     /// Gets associated `$this` object if exists.
     pub fn get_this(&mut self) -> Option<&ZObj> {
         unsafe {
-            let val = ZVal::from_ptr(phper_get_this(&mut self.inner));
+            let val = ZVal::from_ptr(phper_get_this(&self.inner));
             val.as_z_obj()
         }
     }
@@ -143,7 +143,7 @@ impl ExecuteData {
     /// Gets associated mutable `$this` object if exists.
     pub fn get_this_mut(&mut self) -> Option<&mut ZObj> {
         unsafe {
-            let val = ZVal::from_mut_ptr(phper_get_this(&mut self.inner));
+            let val = ZVal::from_mut_ptr(phper_get_this(&self.inner));
             val.as_mut_z_obj()
         }
     }
@@ -165,14 +165,6 @@ impl ExecuteData {
         unsafe {
             let val = phper_zend_call_var_num(self.as_ptr() as *mut _, index.try_into().unwrap());
             ZVal::from_ptr(val)
-        }
-    }
-
-    /// Gets mutable parameter by index.
-    pub fn get_mut_parameter(&mut self, index: usize) -> &mut ZVal {
-        unsafe {
-            let val = phper_zend_call_var_num(self.as_mut_ptr(), index.try_into().unwrap());
-            ZVal::from_mut_ptr(val)
         }
     }
 }

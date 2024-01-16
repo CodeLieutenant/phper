@@ -35,23 +35,23 @@ pub fn make_response_class() -> ClassEntity {
     });
 
     class.add_method("status", Visibility::Public, |this, _arguments| {
-        let response =
-            this.as_state::<Option<Response>>()
-                .as_ref()
-                .ok_or_else(|| HttpClientError::ResponseAfterRead {
-                    method_name: "status".to_owned(),
-                })?;
+        let response = this
+            .as_state::<Option<Response>>()
+            .as_ref()
+            .ok_or_else(|| HttpClientError::ResponseAfterRead {
+                method_name: "status".to_owned(),
+            })?;
 
         Ok::<_, HttpClientError>(response.status().as_u16() as i64)
     });
 
     class.add_method("headers", Visibility::Public, |this, _arguments| {
-        let response =
-            this.as_state::<Option<Response>>()
-                .as_ref()
-                .ok_or_else(|| HttpClientError::ResponseAfterRead {
-                    method_name: "headers".to_owned(),
-                })?;
+        let response = this
+            .as_state::<Option<Response>>()
+            .as_ref()
+            .ok_or_else(|| HttpClientError::ResponseAfterRead {
+                method_name: "headers".to_owned(),
+            })?;
         let headers_map = response
             .headers()
             .iter()

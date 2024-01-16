@@ -192,42 +192,44 @@ bool phper_zend_str_exists(HashTable *ht, const char *str, size_t len);
 // object apis:
 // ==================================================
 
-zval *phper_get_this(zend_execute_data *execute_data);
-size_t phper_zend_object_properties_size(zend_class_entry *ce);
-void *phper_zend_object_alloc(size_t obj_size, zend_class_entry *ce);
-zend_object *(**phper_get_create_object(zend_class_entry *ce))(
-    zend_class_entry *class_type);
-bool phper_object_init_ex(zval *arg, zend_class_entry *class_type);
+zval *phper_get_this(const zend_execute_data *execute_data);
+size_t phper_zend_object_properties_size(const zend_class_entry *ce);
+void *phper_zend_object_alloc(size_t obj_size, const zend_class_entry *ce);
+bool phper_object_init_ex(zval *arg, const zend_class_entry *class_type);
 void phper_zend_object_release(zend_object *obj);
 uint32_t phper_zend_object_gc_refcount(const zend_object *obj);
 
 // ==================================================
 // class apis:
 // ==================================================
-zend_class_entry phper_init_class_entry_ex(const char *class_name,
-                                           size_t class_name_len);
-
+zend_class_entry phper_init_class_entry(const char *class_name,
+                                        size_t class_name_len);
 zend_class_entry *
-phper_register_class_entry_ex(zend_class_entry *ce, zend_class_entry *parent,
-                              const zend_function_entry *functions);
+phper_register_class_entry(zend_class_entry *ce, zend_class_entry *parent,
+                           const zend_function_entry *functions);
 
-zend_class_entry phper_init_interface_entry_ex(const char *class_name,
-                                               size_t class_name_len);
+// ==================================================
+// interface apis:
+// ==================================================
+zend_class_entry phper_init_interface_entry(const char *class_name,
+                                            size_t class_name_len);
+zend_class_entry *
+phper_register_interface_entry(zend_class_entry *ce,
+                               const zend_function_entry *functions);
 
 bool phper_instanceof_function(const zend_class_entry *instance_ce,
                                const zend_class_entry *ce);
 
-zend_class_entry *
-phper_register_interface_entry_ex(zend_class_entry *ce,
-                                  const zend_function_entry *functions);
-
 zend_string *phper_get_function_or_method_name(const zend_function *func);
 zend_string *phper_get_function_name(const zend_function *func);
-bool phper_call_user_function(HashTable *function_table, zval *object,
-                              zval *function_name, zval *retval_ptr,
-                              uint32_t param_count, zval params[]);
-zval *phper_zend_call_var_num(zend_execute_data *execute_data, int index);
-zval *phper_zend_call_arg(zend_execute_data *execute_data, int index);
+bool phper_call_user_function(zval *object, zval *function_name,
+                              zval *retval_ptr, const zval *params,
+                              uint32_t param_count,
+                              const HashTable *named_params);
+const zval *phper_zend_call_var_num(const zend_execute_data *execute_data,
+                                    int index);
+const zval *phper_zend_call_arg(const zend_execute_data *execute_data,
+                                int index);
 uint32_t phper_zend_num_args(const zend_execute_data *execute_data);
 bool phper_zend_get_parameters_array_ex(uint32_t param_count,
                                         zval *argument_array);
@@ -259,6 +261,7 @@ zend_internal_arg_info
 phper_zend_begin_arg_info_ex(bool return_reference,
                              uintptr_t required_num_args);
 zend_internal_arg_info phper_zend_arg_info(bool pass_by_ref, const char *name);
+
 // ==================================================
 // Constants API:
 // ==================================================

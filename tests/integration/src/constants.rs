@@ -17,5 +17,9 @@ pub fn integrate(module: &mut Module) {
     module.add_constant("INTEGRATE_CONST_LONG", 100i64, None);
     module.add_constant("INTEGRATE_CONST_DOUBLE", 200., None);
     module.add_constant("INTEGRATE_CONST_STRING", "something", None);
-    module.add_constant("INTEGRATE_CONST_BYTES", "something".as_bytes().to_owned(), None);
+    module.add_constant(
+        "INTEGRATE_CONST_BYTES",
+        "something".as_bytes().to_owned(),
+        None,
+    );
 }

@@ -13,7 +13,6 @@
 //! TODO Add lambda.
 
 use crate::{
-    cg,
     classes::{entry::ClassEntry, RawVisibility, Visibility},
     errors::{throw, ArgumentCountError, ExceptionGuard, ThrowObject, Throwable},
     objects::{StateObj, ZObj, ZObject},
@@ -469,15 +468,15 @@ pub(crate) fn call_internal(
 
     call_raw_common(|ret| unsafe {
         phper_call_user_function(
-            cg!(function_table),
             object_val
                 .as_mut()
                 .map(|o| o.as_mut_ptr())
                 .unwrap_or(null_mut()),
             func_ptr,
             ret.as_mut_ptr(),
-            arguments.len() as u32,
             arguments.as_mut_ptr().cast(),
+            arguments.len() as u32,
+            null_mut(),
         );
     })
 }

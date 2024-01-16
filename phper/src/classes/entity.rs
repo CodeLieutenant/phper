@@ -1,8 +1,8 @@
 use std::{any::Any, marker::PhantomData, mem::zeroed, ptr::null_mut, rc::Rc};
 
 use phper_sys::{
-    phper_get_create_object, phper_init_class_entry_ex, phper_register_class_entry_ex,
-    zend_class_entry, zend_class_implements, zend_function_entry,
+    phper_init_class_entry, phper_register_class_entry, zend_class_entry, zend_class_implements,
+    zend_function_entry,
 };
 
 use crate::{
@@ -76,7 +76,7 @@ impl ClassEntity {
         let class_name_len = class_name.len();
 
         Self {
-            class: unsafe { phper_init_class_entry_ex(class_name.as_ptr().cast(), class_name_len) },
+            class: unsafe { phper_init_class_entry(class_name.as_ptr().cast(), class_name_len) },
             state_constructor: Rc::new(move || {
                 let state = state_constructor();
                 let boxed = Box::new(state) as Box<dyn Any>;
@@ -311,7 +311,7 @@ impl crate::modules::Registerer for ClassEntity {
                 .unwrap_or(null_mut());
 
             let class_ce =
-                phper_register_class_entry_ex(&mut self.class, parent, self.function_entries());
+                phper_register_class_entry(&mut self.class, parent, self.function_entries());
 
             if let Some(bind_class) = self.bind_class {
                 bind_class.bind(class_ce);
@@ -322,7 +322,7 @@ impl crate::modules::Registerer for ClassEntity {
                 zend_class_implements(class_ce, 1, interface_ce);
             }
 
-            *phper_get_create_object(class_ce) = Some(create_object);
+            (*class_ce).__bindgen_anon_2.create_object = Some(create_object);
 
             for property in &self.property_entities {
                 property.declare(class_ce);
