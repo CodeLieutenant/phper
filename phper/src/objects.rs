@@ -24,10 +24,11 @@ use std::{
     ffi::c_void,
     fmt::{self, Debug},
     marker::PhantomData,
-    mem::{replace, size_of, ManuallyDrop},
+    mem::{replace, ManuallyDrop},
     ops::{Deref, DerefMut},
     ptr::null_mut,
 };
+use memoffset::offset_of;
 
 /// Wrapper of [zend_object].
 #[repr(transparent)]
@@ -391,7 +392,7 @@ impl StateObj {
     /// The `zend_object_alloc` often allocate more memory to hold the state
     /// (usually is a pointer), and place it before `zend_object`.
     pub(crate) const fn offset() -> usize {
-        size_of::<AnyState>()
+        offset_of!(Self, object)
     }
 
     #[inline]
