@@ -9,11 +9,13 @@ zend_string *phper_get_function_name(const zend_function *func) {
 }
 
 bool phper_call_user_function(zval *object, zval *function_name,
-                              zval *retval_ptr, zval params[static 1],
-                              uint32_t param_count, HashTable *named_params) {
+                              zval *retval_ptr, const zval *params,
+                              uint32_t param_count,
+                              const HashTable *named_params) {
 
     _call_user_function_impl(object, function_name, retval_ptr, param_count,
-                             params, named_params) == SUCCESS;
+                             (zval *)params,
+                             (HashTable *)named_params) == SUCCESS;
 }
 
 const zval *phper_zend_call_var_num(const zend_execute_data *execute_data,

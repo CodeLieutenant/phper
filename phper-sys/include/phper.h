@@ -222,8 +222,9 @@ phper_register_interface_entry_ex(zend_class_entry *ce,
 zend_string *phper_get_function_or_method_name(const zend_function *func);
 zend_string *phper_get_function_name(const zend_function *func);
 bool phper_call_user_function(zval *object, zval *function_name,
-                              zval *retval_ptr, zval params[static 1],
-                              uint32_t param_count, HashTable *named_params);
+                              zval *retval_ptr, const zval *params,
+                              uint32_t param_count,
+                              const HashTable *named_params);
 const zval *phper_zend_call_var_num(const zend_execute_data *execute_data,
                                     int index);
 const zval *phper_zend_call_arg(const zend_execute_data *execute_data,
