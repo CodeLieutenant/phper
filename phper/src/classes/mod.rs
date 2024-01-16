@@ -189,7 +189,7 @@ impl InterfaceEntity {
 
         Self {
             interface: unsafe {
-                phper_init_class_entry_ex(interface_name.as_ptr().cast(), interface_name_len)
+                phper_init_interface_entry(interface_name.as_ptr().cast(), interface_name_len)
             },
             method_entities: Vec::new(),
             extends: Vec::new(),
@@ -251,7 +251,7 @@ impl crate::modules::Registerer for InterfaceEntity {
     fn register(&mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
         unsafe {
             let class_ce =
-                phper_register_interface_entry_ex(&mut self.interface, self.function_entries());
+                phper_register_interface_entry(&mut self.interface, self.function_entries());
 
             if let Some(bind_interface) = self.bind_interface {
                 bind_interface.bind(class_ce);
