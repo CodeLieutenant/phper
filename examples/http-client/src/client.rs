@@ -21,12 +21,14 @@ const HTTP_CLIENT_BUILDER_CLASS_NAME: &str = "HttpClient\\HttpClientBuilder";
 
 const HTTP_CLIENT_CLASS_NAME: &str = "HttpClient\\HttpClient";
 
-static HTTP_CLIENT_CLASS: StaticStateClass<Option<Client>> = StaticStateClass::null();
+static HTTP_CLIENT_CLASS: StaticStateClass = StaticStateClass::null();
 
-pub fn make_client_builder_class() -> ClassEntity<ClientBuilder> {
+pub fn make_client_builder_class() -> ClassEntity {
     // `new_with_default_state_constructor` means initialize the state of
     // `ClientBuilder` as `Default::default`.
-    let mut class = ClassEntity::new_with_default_state_constructor(HTTP_CLIENT_BUILDER_CLASS_NAME);
+    let mut class = ClassEntity::new_with_default_state_constructor::<Option<&Client>>(
+        HTTP_CLIENT_BUILDER_CLASS_NAME,
+    );
 
     // Inner call the `ClientBuilder::timeout`.
     class
@@ -63,9 +65,9 @@ pub fn make_client_builder_class() -> ClassEntity<ClientBuilder> {
     class
 }
 
-pub fn make_client_class() -> ClassEntity<Option<Client>> {
+pub fn make_client_class() -> ClassEntity {
     let mut class =
-        ClassEntity::<Option<Client>>::new_with_default_state_constructor(HTTP_CLIENT_CLASS_NAME);
+        ClassEntity::new_with_default_state_constructor::<Option<Client>>(HTTP_CLIENT_CLASS_NAME);
 
     class.bind(&HTTP_CLIENT_CLASS);
 
@@ -76,7 +78,7 @@ pub fn make_client_class() -> ClassEntity<Option<Client>> {
     class
         .add_method("get", Visibility::Public, |this, arguments| {
             let url = arguments[0].expect_z_str()?.to_str().unwrap();
-            let client = this.as_state().as_ref().unwrap();
+            let client = this.as_state::<Option<Client>>().as_ref().unwrap();
             let request_builder = client.get(url);
             let mut object = REQUEST_BUILDER_CLASS.init_object()?;
             *object.as_mut_state() = Some(request_builder);
@@ -87,7 +89,7 @@ pub fn make_client_class() -> ClassEntity<Option<Client>> {
     class
         .add_method("post", Visibility::Public, |this, arguments| {
             let url = arguments[0].expect_z_str()?.to_str().unwrap();
-            let client = this.as_state().as_ref().unwrap();
+            let client = this.as_state::<Option<&Client>>().as_ref().unwrap();
             let request_builder = client.post(url);
             let mut object = REQUEST_BUILDER_CLASS.init_object()?;
             *object.as_mut_state() = Some(request_builder);

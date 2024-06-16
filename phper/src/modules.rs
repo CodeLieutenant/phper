@@ -10,6 +10,7 @@
 
 //! Apis relate to [zend_module_entry].
 
+use crate::constants;
 use crate::{
     c_str_ptr,
     classes::{entity::ClassEntity, InterfaceEntity},
@@ -18,14 +19,13 @@ use crate::{
     functions::{Function, FunctionEntity, FunctionEntry},
     ini,
     sys::*,
-    types::Scalar,
     utils::ensure_end_with_zero,
     values::ZVal,
 };
 use std::{
     collections::HashMap,
     ffi::CString,
-    mem::{size_of, take, transmute, zeroed},
+    mem::{size_of, take, zeroed},
     os::raw::{c_int, c_uchar, c_uint, c_ushort},
     ptr::{null, null_mut},
     rc::Rc,
@@ -33,10 +33,14 @@ use std::{
 
 /// Global pointer hold the Module builder.
 /// Because PHP is single threaded, so there is no lock here.
-static mut GLOBAL_MODULE: Option<Box<Module>> = None;
+static mut GLOBAL_MODULE: *mut Module = null_mut();
 pub(crate) static mut GLOBAL_MODULE_NUMBER: i32 = 0;
 
 static mut GLOBAL_MODULE_ENTRY: *mut zend_module_entry = null_mut();
+
+unsafe fn get_module() -> &'static mut Module {
+    unsafe { GLOBAL_MODULE.as_mut().unwrap_unchecked() }
+}
 
 /// PHP Module information
 pub struct ModuleInfo {
@@ -47,23 +51,24 @@ pub struct ModuleInfo {
     pub number: i32,
 }
 
+pub(crate) trait Registerer {
+    fn register(&mut self, module_number: i32) -> Result<(), Box<dyn std::error::Error>>;
+}
+
 unsafe extern "C" fn module_startup(_type: c_int, module_number: c_int) -> c_int {
-    let module = GLOBAL_MODULE.as_mut().unwrap();
+    let module: &mut Module = get_module();
     GLOBAL_MODULE_NUMBER = module_number;
 
     ini::register(take(&mut module.ini_entities), module_number);
 
-    for constant in &module.constants {
-        constant.register(module_number);
-    }
-
-    for class_entity in &module.class_entities {
-        let ce = class_entity.init();
-        class_entity.declare_properties(ce);
-    }
-
-    for interface_entity in &module.interface_entities {
-        interface_entity.init();
+    for mut entity in take(&mut module.entities).into_iter() {
+        if let Err(err) = entity.register(module_number) {
+            crate::output::log(
+                crate::output::LogLevel::Error,
+                format!("Failed to register: {err:?}"),
+            );
+            return ZEND_RESULT_CODE_FAILURE;
+        }
     }
 
     if let Some(f) = take(&mut module.module_init) {
@@ -78,7 +83,7 @@ unsafe extern "C" fn module_startup(_type: c_int, module_number: c_int) -> c_int
 
 unsafe extern "C" fn module_shutdown(_type: c_int, module_number: c_int) -> c_int {
     {
-        let module = GLOBAL_MODULE.as_mut().unwrap();
+        let module = get_module();
 
         ini::unregister(module_number);
 
@@ -88,41 +93,43 @@ unsafe extern "C" fn module_shutdown(_type: c_int, module_number: c_int) -> c_in
                 number: module_number,
             });
         }
-    }
 
-    // std::mem::replace(GLOBAL_MODULE.as_mut().unwrap(), null_mut());
+        if let Some(ref mut f) = take(&mut module.request_init) {
+            let _b = Box::from_raw(f);
+        }
+
+        if let Some(ref mut f) = take(&mut module.request_shutdown) {
+            let _b = Box::from_raw(f);
+        }
+    }
 
     ZEND_RESULT_CODE_SUCCESS
 }
 
 unsafe extern "C" fn request_startup(_type: c_int, module_number: c_int) -> c_int {
-    let module = GLOBAL_MODULE.as_ref().unwrap();
+    let f = get_module().request_init.unwrap_unchecked();
 
-    if let Some(f) = &module.request_init {
-        f(ModuleInfo {
-            ty: _type,
-            number: module_number,
-        });
-    }
+    f(ModuleInfo {
+        ty: _type,
+        number: module_number,
+    });
 
     ZEND_RESULT_CODE_SUCCESS
 }
 
 unsafe extern "C" fn request_shutdown(_type: c_int, module_number: c_int) -> c_int {
-    let module = GLOBAL_MODULE.as_ref().unwrap();
+    let f = get_module().request_shutdown.unwrap_unchecked();
 
-    if let Some(f) = &module.request_shutdown {
-        f(ModuleInfo {
-            ty: _type,
-            number: module_number,
-        });
-    }
+    f(ModuleInfo {
+        ty: _type,
+        number: module_number,
+    });
 
     ZEND_RESULT_CODE_SUCCESS
 }
 
 unsafe extern "C" fn module_info(zend_module: *mut zend_module_entry) {
-    let module = GLOBAL_MODULE.as_ref().unwrap();
+    let module = get_module();
 
     php_info_print_table_start();
     if !module.version.as_bytes().is_empty() {
@@ -141,29 +148,40 @@ unsafe extern "C" fn module_info(zend_module: *mut zend_module_entry) {
 
 /// Builder for registering PHP Module.
 #[allow(clippy::type_complexity)]
+#[derive(Default)]
 pub struct Module {
     name: CString,
     version: CString,
     author: CString,
     module_init: Option<Box<dyn FnOnce(ModuleInfo)>>,
     module_shutdown: Option<Box<dyn FnOnce(ModuleInfo)>>,
-    request_init: Option<Box<dyn Fn(ModuleInfo)>>,
-    request_shutdown: Option<Box<dyn Fn(ModuleInfo)>>,
+    request_init: Option<&'static dyn Fn(ModuleInfo)>,
+    request_shutdown: Option<&'static dyn Fn(ModuleInfo)>,
     function_entities: Vec<FunctionEntity>,
-    class_entities: Vec<ClassEntity<()>>,
-    interface_entities: Vec<InterfaceEntity>,
-    constants: Vec<Constant>,
+    entities: Vec<Entities>,
     ini_entities: Vec<zend_ini_entry_def>,
     infos: HashMap<CString, CString>,
 }
 
+pub(crate) enum Entities {
+    Constant(Constant),
+    Class(ClassEntity),
+    Interface(InterfaceEntity),
+}
+
+impl Registerer for Entities {
+    fn register(&mut self, module_number: i32) -> Result<(), Box<dyn std::error::Error>> {
+        match self {
+            Entities::Constant(con) => con.register(module_number),
+            Entities::Class(class) => class.register(module_number),
+            Entities::Interface(interface) => interface.register(module_number),
+        }
+    }
+}
+
 impl Module {
     /// Construct the `Module` with base metadata.
-    pub fn new(
-        name: impl Into<String>,
-        version: impl Into<String>,
-        author: impl Into<String>,
-    ) -> Self {
+    pub fn new(name: impl AsRef<str>, version: impl AsRef<str>, author: impl AsRef<str>) -> Self {
         Self {
             name: ensure_end_with_zero(name),
             version: ensure_end_with_zero(version),
@@ -173,9 +191,7 @@ impl Module {
             request_init: None,
             request_shutdown: None,
             function_entities: vec![],
-            class_entities: Default::default(),
-            interface_entities: Default::default(),
-            constants: Default::default(),
+            entities: Default::default(),
             ini_entities: Default::default(),
             infos: Default::default(),
         }
@@ -193,18 +209,18 @@ impl Module {
 
     /// Register `RINIT` hook.
     pub fn on_request_init(&mut self, func: impl Fn(ModuleInfo) + 'static) {
-        self.request_init = Some(Box::new(func));
+        self.request_init = Some(Box::leak(Box::new(func)));
     }
 
     /// Register `RSHUTDOWN` hook.
     pub fn on_request_shutdown(&mut self, func: impl Fn(ModuleInfo) + 'static) {
-        self.request_shutdown = Some(Box::new(func));
+        self.request_shutdown = Some(Box::leak(Box::new(func)));
     }
 
     /// Register function to module.
     pub fn add_function<F, Z, E>(
         &mut self,
-        name: impl Into<String>,
+        name: impl AsRef<str>,
         handler: F,
     ) -> &mut FunctionEntity
     where
@@ -218,18 +234,24 @@ impl Module {
     }
 
     /// Register class to module.
-    pub fn add_class<T>(&mut self, class: ClassEntity<T>) {
-        self.class_entities.push(unsafe { transmute(class) });
+    pub fn add_class(&mut self, class: ClassEntity) {
+        self.entities.push(Entities::Class(class));
     }
 
     /// Register interface to module.
     pub fn add_interface(&mut self, interface: InterfaceEntity) {
-        self.interface_entities.push(interface);
+        self.entities.push(Entities::Interface(interface));
     }
 
     /// Register constant to module.
-    pub fn add_constant(&mut self, name: impl Into<String>, value: impl Into<Scalar>) {
-        self.constants.push(Constant::new(name, value));
+    pub fn add_constant(
+        &mut self,
+        name: impl AsRef<str>,
+        value: impl Into<ZVal>,
+        flags: Option<constants::Flags>,
+    ) {
+        self.entities
+            .push(Entities::Constant(Constant::new(name, value, flags)));
     }
 
     /// Register ini configuration to module.
@@ -271,7 +293,7 @@ impl Module {
             "module version must be set"
         );
 
-        let module: Box<Module> = Box::new(self);
+        let module = Box::leak(Box::new(self));
 
         let entry = Box::new(zend_module_entry {
             size: size_of::<zend_module_entry>() as c_ushort,
@@ -284,8 +306,16 @@ impl Module {
             functions: module.function_entries(),
             module_startup_func: Some(module_startup),
             module_shutdown_func: Some(module_shutdown),
-            request_startup_func: Some(request_startup),
-            request_shutdown_func: Some(request_shutdown),
+            request_startup_func: if module.request_init.is_some() {
+                Some(request_startup)
+            } else {
+                None
+            },
+            request_shutdown_func: if module.request_shutdown.is_some() {
+                Some(request_shutdown)
+            } else {
+                None
+            },
             info_func: Some(module_info),
             version: module.version.as_ptr(),
             globals_size: 0,
@@ -303,7 +333,7 @@ impl Module {
             build_id: phper_get_zend_module_build_id(),
         });
 
-        GLOBAL_MODULE = Some(module);
+        GLOBAL_MODULE = module;
         GLOBAL_MODULE_ENTRY = Box::into_raw(entry);
 
         GLOBAL_MODULE_ENTRY

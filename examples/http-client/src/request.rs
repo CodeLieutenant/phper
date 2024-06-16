@@ -15,11 +15,10 @@ use std::{convert::Infallible, mem::take};
 
 pub const REQUEST_BUILDER_CLASS_NAME: &str = "HttpClient\\RequestBuilder";
 
-pub static REQUEST_BUILDER_CLASS: StaticStateClass<Option<RequestBuilder>> =
-    StaticStateClass::null();
+pub static REQUEST_BUILDER_CLASS: StaticStateClass = StaticStateClass::null();
 
-pub fn make_request_builder_class() -> ClassEntity<Option<RequestBuilder>> {
-    let mut class = ClassEntity::<Option<RequestBuilder>>::new_with_default_state_constructor(
+pub fn make_request_builder_class() -> ClassEntity {
+    let mut class = ClassEntity::new_with_default_state_constructor::<Option<RequestBuilder>>(
         REQUEST_BUILDER_CLASS_NAME,
     );
 
@@ -30,8 +29,8 @@ pub fn make_request_builder_class() -> ClassEntity<Option<RequestBuilder>> {
     });
 
     class.add_method("send", Visibility::Public, |this, _arguments| {
-        let state = take(this.as_mut_state());
-        let response = state.unwrap().send().map_err(HttpClientError::Reqwest)?;
+        let state = take(this.as_mut_state::<Option<RequestBuilder>>()).unwrap();
+        let response = state.send().map_err(HttpClientError::Reqwest)?;
         let mut object = RESPONSE_CLASS.new_object([])?;
         *object.as_mut_state() = Some(response);
         Ok::<_, phper::Error>(object)

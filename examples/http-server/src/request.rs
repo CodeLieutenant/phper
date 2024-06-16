@@ -17,10 +17,10 @@ use std::convert::Infallible;
 
 pub const HTTP_REQUEST_CLASS_NAME: &str = "HttpServer\\HttpRequest";
 
-pub static HTTP_REQUEST_CLASS: StaticStateClass<()> = StaticStateClass::null();
+pub static HTTP_REQUEST_CLASS: StaticStateClass = StaticStateClass::null();
 
 /// Register the class `HttpServer\HttpRequest` by `ClassEntity`.
-pub fn make_request_class() -> ClassEntity<()> {
+pub fn make_request_class() -> ClassEntity {
     let mut class = ClassEntity::new(HTTP_REQUEST_CLASS_NAME);
 
     // The state class will be initialized after class registered.
@@ -43,6 +43,6 @@ pub fn make_request_class() -> ClassEntity<()> {
 }
 
 /// Instantiate the object with class `HttpServer\HttpRequest`.
-pub fn new_request_object() -> phper::Result<StateObject<()>> {
+pub fn new_request_object() -> phper::Result<StateObject> {
     HTTP_REQUEST_CLASS.new_object([])
 }

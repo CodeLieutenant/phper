@@ -135,7 +135,7 @@ impl ExecuteData {
     /// Gets associated `$this` object if exists.
     pub fn get_this(&mut self) -> Option<&ZObj> {
         unsafe {
-            let val = ZVal::from_ptr(phper_get_this(&mut self.inner));
+            let val = ZVal::from_ptr(phper_get_this(&self.inner));
             val.as_z_obj()
         }
     }
@@ -143,7 +143,7 @@ impl ExecuteData {
     /// Gets associated mutable `$this` object if exists.
     pub fn get_this_mut(&mut self) -> Option<&mut ZObj> {
         unsafe {
-            let val = ZVal::from_mut_ptr(phper_get_this(&mut self.inner));
+            let val = ZVal::from_mut_ptr(phper_get_this(&self.inner));
             val.as_mut_z_obj()
         }
     }
@@ -167,20 +167,12 @@ impl ExecuteData {
             ZVal::from_ptr(val)
         }
     }
-
-    /// Gets mutable parameter by index.
-    pub fn get_mut_parameter(&mut self, index: usize) -> &mut ZVal {
-        unsafe {
-            let val = phper_zend_call_var_num(self.as_mut_ptr(), index.try_into().unwrap());
-            ZVal::from_mut_ptr(val)
-        }
-    }
 }
 
 /// Wrapper of [zval].
 #[repr(transparent)]
 pub struct ZVal {
-    inner: zval,
+    pub(crate) inner: zval,
     _p: PhantomData<*mut ()>,
 }
 
@@ -798,8 +790,8 @@ impl From<ZObject> for ZVal {
     }
 }
 
-impl<T> From<StateObject<T>> for ZVal {
-    fn from(obj: StateObject<T>) -> Self {
+impl From<StateObject> for ZVal {
+    fn from(obj: StateObject) -> Self {
         ZVal::from(obj.into_z_object())
     }
 }

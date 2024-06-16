@@ -12,6 +12,6 @@
 
 use std::ffi::CString;
 
-pub(crate) fn ensure_end_with_zero(s: impl Into<String>) -> CString {
-    CString::new(s.into()).expect("CString::new failed")
+pub(crate) fn ensure_end_with_zero(s: impl AsRef<str>) -> CString {
+    CString::new(s.as_ref()).expect("CString::new failed")
 }

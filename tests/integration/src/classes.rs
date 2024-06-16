@@ -8,8 +8,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use phper::alloc::RefClone;
 use phper::{
-    alloc::RefClone,
     classes::{
         entity::ClassEntity,
         entry::ClassEntry,
@@ -59,7 +59,7 @@ fn integrate_a(module: &mut Module) {
     module.add_class(class);
 }
 
-static FOO_CLASS: StaticStateClass<Foo> = StaticStateClass::null();
+static FOO_CLASS: StaticStateClass = StaticStateClass::null();
 
 struct Foo {
     position: usize,
@@ -79,25 +79,25 @@ fn integrate_foo(module: &mut Module) {
 
     // Implement Iterator interface.
     class.add_method("current", Visibility::Public, |this, _arguments| {
-        let state = this.as_state();
+        let state = this.as_state::<Foo>();
         Ok::<_, phper::Error>(format!("Current: {}", state.position))
     });
     class.add_method("key", Visibility::Public, |this, _arguments| {
-        let state = this.as_state();
+        let state = this.as_state::<Foo>();
         Ok::<_, phper::Error>(state.position as i64)
     });
     class.add_method("next", Visibility::Public, |this, _arguments| {
-        let state = this.as_mut_state();
+        let state = this.as_mut_state::<Foo>();
         state.position += 1;
         Ok::<_, Infallible>(())
     });
     class.add_method("rewind", Visibility::Public, |this, _arguments| {
-        let state = this.as_mut_state();
+        let state = this.as_mut_state::<Foo>();
         state.position = 0;
         Ok::<_, Infallible>(())
     });
     class.add_method("valid", Visibility::Public, |this, _arguments| {
-        let state = this.as_state();
+        let state = this.as_state::<Foo>();
         Ok::<_, Infallible>(state.position < 3)
     });
 
@@ -105,7 +105,7 @@ fn integrate_foo(module: &mut Module) {
     class
         .add_method("offsetExists", Visibility::Public, |this, arguments| {
             let offset = arguments[0].expect_long()?;
-            let state = this.as_state();
+            let state = this.as_state::<Foo>();
             Ok::<_, phper::Error>(state.array.get(&offset).is_some())
         })
         .argument(Argument::by_val("offset"));
@@ -113,7 +113,7 @@ fn integrate_foo(module: &mut Module) {
     class
         .add_method("offsetGet", Visibility::Public, |this, arguments| {
             let offset = arguments[0].expect_long()?;
-            let state = this.as_mut_state();
+            let state = this.as_mut_state::<Foo>();
             let val = state.array.get_mut(&offset).map(|val| val.ref_clone());
             Ok::<_, phper::Error>(val)
         })
@@ -123,7 +123,7 @@ fn integrate_foo(module: &mut Module) {
         .add_method("offsetSet", Visibility::Public, |this, arguments| {
             let offset = arguments[0].expect_long()?;
             let value = arguments[1].clone();
-            let state = this.as_mut_state();
+            let state = this.as_mut_state::<Foo>();
             state.array.insert(offset, value);
             Ok::<_, phper::Error>(())
         })
@@ -132,7 +132,7 @@ fn integrate_foo(module: &mut Module) {
     class
         .add_method("offsetUnset", Visibility::Public, |this, arguments| {
             let offset = arguments[0].expect_long()?;
-            let state = this.as_mut_state();
+            let state = this.as_mut_state::<Foo>();
             state.array.remove(&offset);
             Ok::<_, phper::Error>(())
         })

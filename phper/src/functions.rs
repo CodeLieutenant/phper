@@ -13,8 +13,6 @@
 //! TODO Add lambda.
 
 use crate::{
-    arguments::Argument,
-    cg,
     classes::{entry::ClassEntry, RawVisibility, Visibility},
     errors::{throw, ArgumentCountError, ExceptionGuard, ThrowObject, Throwable},
     objects::{StateObj, ZObj, ZObject},
@@ -65,17 +63,17 @@ where
     }
 }
 
-pub(crate) struct Method<F, Z, E, T>(F, PhantomData<(Z, E, T)>);
+pub(crate) struct Method<F, Z, E>(F, PhantomData<(Z, E)>);
 
-impl<F, Z, E, T> Method<F, Z, E, T> {
+impl<F, Z, E> Method<F, Z, E> {
     pub(crate) fn new(f: F) -> Self {
         Self(f, PhantomData)
     }
 }
 
-impl<F, Z, E, T: 'static> Callable for Method<F, Z, E, T>
+impl<F, Z, E> Callable for Method<F, Z, E>
 where
-    F: Fn(&mut StateObj<T>, &mut [ZVal]) -> Result<Z, E>,
+    F: Fn(&mut StateObj, &mut [ZVal]) -> Result<Z, E>,
     Z: Into<ZVal>,
     E: Throwable,
 {
@@ -178,7 +176,7 @@ pub struct FunctionEntity {
 
 impl FunctionEntity {
     #[inline]
-    pub(crate) fn new(name: impl Into<String>, handler: Rc<dyn Callable>) -> Self {
+    pub(crate) fn new(name: impl AsRef<str>, handler: Rc<dyn Callable>) -> Self {
         FunctionEntity {
             name: ensure_end_with_zero(name),
             handler,
@@ -212,7 +210,7 @@ pub struct MethodEntity {
 impl MethodEntity {
     #[inline]
     pub(crate) fn new(
-        name: impl Into<String>,
+        name: impl AsRef<str>,
         handler: Option<Rc<dyn Callable>>,
         visibility: Visibility,
     ) -> Self {
@@ -248,6 +246,55 @@ impl MethodEntity {
     pub fn arguments(&mut self, arguments: impl IntoIterator<Item = Argument>) -> &mut Self {
         self.arguments.extend(arguments);
         self
+    }
+}
+
+/// Function or method argument info.
+pub struct Argument {
+    name: CString,
+    pass_by_ref: bool,
+    required: bool,
+}
+
+impl Argument {
+    /// Indicate the argument is pass by value.
+    pub fn by_val(name: impl AsRef<str>) -> Self {
+        let name = ensure_end_with_zero(name);
+        Self {
+            name,
+            pass_by_ref: false,
+            required: true,
+        }
+    }
+
+    /// Indicate the argument is pass by reference.
+    pub fn by_ref(name: impl AsRef<str>) -> Self {
+        let name = ensure_end_with_zero(name);
+        Self {
+            name,
+            pass_by_ref: true,
+            required: true,
+        }
+    }
+
+    /// Indicate the argument is pass by value and is optional.
+    pub fn by_val_optional(name: impl AsRef<str>) -> Self {
+        let name = ensure_end_with_zero(name);
+        Self {
+            name,
+            pass_by_ref: false,
+            required: false,
+        }
+    }
+
+    /// Indicate the argument is pass by reference nad is optional.
+    pub fn by_ref_optional(name: impl AsRef<str>) -> Self {
+        let name = ensure_end_with_zero(name);
+        Self {
+            name,
+            pass_by_ref: true,
+            required: false,
+        }
     }
 }
 
@@ -326,23 +373,20 @@ impl ZFunc {
             .unwrap_or(null_mut());
 
         call_raw_common(|ret| unsafe {
-            #[cfg(phper_major_version = "8")]
-            {
-                let class_ptr = object
-                    .as_mut()
-                    .map(|o| o.get_mut_class().as_mut_ptr())
-                    .unwrap_or(null_mut());
+            let class_ptr = object
+                .as_mut()
+                .map(|o| o.get_mut_class().as_mut_ptr())
+                .unwrap_or(null_mut());
 
-                zend_call_known_function(
-                    function_handler,
-                    object_ptr,
-                    class_ptr,
-                    ret.as_mut_ptr(),
-                    arguments.len() as u32,
-                    arguments.as_mut_ptr().cast(),
-                    null_mut(),
-                );
-            }
+            zend_call_known_function(
+                function_handler,
+                object_ptr,
+                class_ptr,
+                ret.as_mut_ptr(),
+                arguments.len() as u32,
+                arguments.as_mut_ptr().cast(),
+                null_mut(),
+            );
         })
     }
 }
@@ -424,15 +468,15 @@ pub(crate) fn call_internal(
 
     call_raw_common(|ret| unsafe {
         phper_call_user_function(
-            cg!(function_table),
             object_val
                 .as_mut()
                 .map(|o| o.as_mut_ptr())
                 .unwrap_or(null_mut()),
             func_ptr,
             ret.as_mut_ptr(),
-            arguments.len() as u32,
             arguments.as_mut_ptr().cast(),
+            arguments.len() as u32,
+            null_mut(),
         );
     })
 }
