@@ -15,6 +15,7 @@
 use bindgen::Builder;
 use phper_sys::*;
 use std::ffi::OsStr;
+use std::path::Path;
 use walkdir::WalkDir;
 
 /// Register all php build relative configure parameters, used in `build.rs`.
@@ -58,7 +59,7 @@ pub fn register_link_args() {
 }
 
 /// Includes php bindings for function/method arguments
-pub fn generate_php_function_args(output_dir: &str, dirs: &[&str]) {
+pub fn generate_php_function_args<P: AsRef<Path>>(output_dir: P, dirs: &[P]) {
     for dir in dirs {
         let walk = WalkDir::new(dir).max_depth(12).follow_links(false);
  
@@ -73,6 +74,7 @@ pub fn generate_php_function_args(output_dir: &str, dirs: &[&str]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_generate_function_args() {
         generate_php_function_args(".", &["."]);

@@ -23,3 +23,7 @@ license = { workspace = true }
 phper-sys = { workspace = true }
 bindgen = "0.69.4"
 walkdir = "2"
+
+[dev-dependencies]
+assert_fs = {version = "^1", features = ["color"] }
+predicates = "3.1.0"
