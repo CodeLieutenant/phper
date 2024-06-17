@@ -18,12 +18,7 @@ mod macros;
 
 pub mod arrays;
 pub mod classes;
-<<<<<<< HEAD
-pub mod arguments;
-pub(crate) mod constants;
-=======
 pub mod constants;
->>>>>>> 217b34537f1e0f2d5fd7803bc1be241a5a1ac763
 pub mod errors;
 pub mod functions;
 pub mod ini;
