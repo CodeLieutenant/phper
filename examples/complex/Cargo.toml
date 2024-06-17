@@ -29,3 +29,5 @@ phper-test = { workspace = true }
 
 [build-dependencies]
 phper-build = { workspace = true }
+bindgen = "0.69.4"
+walkdir = "2"

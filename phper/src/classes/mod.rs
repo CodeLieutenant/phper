@@ -31,6 +31,7 @@ use std::{
     slice,
     sync::atomic::{AtomicPtr, Ordering},
 };
+use std::ptr::null;
 
 use self::entry::ClassEntry;
 
@@ -200,7 +201,7 @@ impl InterfaceEntity {
     /// Add member method to interface, with mandatory visibility public
     /// abstract.
     pub fn add_method(&mut self, name: impl AsRef<str>) -> &mut MethodEntity {
-        let mut entity = MethodEntity::new(name, None, Visibility::Public);
+        let mut entity = MethodEntity::new(name, None, Visibility::Public, null());
         entity.set_vis_abstract();
         self.method_entities.push(entity);
         self.method_entities.last_mut().unwrap()

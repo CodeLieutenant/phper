@@ -8,7 +8,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use phper::{echo, arguments::Argument, modules::Module, php_get_module, values::ZVal};
+use std::ptr::null;
+use phper::{echo, modules::Module, php_get_module, values::ZVal};
 
 /// The php function, receive arguments with type `ZVal`.
 fn say_hello(arguments: &mut [ZVal]) -> phper::Result<()> {
@@ -35,8 +36,8 @@ pub fn get_module() -> Module {
 
     // Register function `say_hello`, with one argument `name`.
     module
-        .add_function("say_hello", say_hello)
-        .argument(Argument::by_val("name"));
+        .add_function("say_hello", null(), say_hello);
+        // .argument(Argument::by_val("name"));
 
     module
 }

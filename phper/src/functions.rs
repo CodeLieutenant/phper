@@ -25,7 +25,7 @@ use phper_alloc::ToRefOwned;
 use std::{
     ffi::{CStr, CString},
     marker::PhantomData,
-    mem::{transmute, zeroed},
+    mem::{transmute},
     ptr::{self, null_mut},
     rc::Rc,
 };
@@ -109,7 +109,7 @@ impl FunctionEntry {
     pub(crate) unsafe fn from_function_entity(entity: &FunctionEntity) -> zend_function_entry {
         Self::entry(
             &entity.name,
-            &entity.arguments,
+            entity.arguments,
             Some(entity.handler.clone()),
             None,
         )
@@ -118,33 +118,18 @@ impl FunctionEntry {
     pub(crate) unsafe fn from_method_entity(entity: &MethodEntity) -> zend_function_entry {
         Self::entry(
             &entity.name,
-            &entity.arguments,
+            entity.arguments,
             entity.handler.clone(),
             Some(entity.visibility),
         )
     }
 
-    /// Will leak memory
     unsafe fn entry(
         name: &CStr,
-        arguments: &[Argument],
+        arguments: *const zend_internal_arg_info,
         handler: Option<Rc<dyn Callable>>,
         visibility: Option<RawVisibility>,
     ) -> zend_function_entry {
-        let mut infos = Vec::new();
-
-        let require_arg_count = arguments.iter().filter(|arg| arg.required).count();
-        infos.push(phper_zend_begin_arg_info_ex(false, require_arg_count));
-
-        for arg in arguments {
-            infos.push(phper_zend_arg_info(
-                arg.pass_by_ref,
-                arg.name.as_ptr().cast(),
-            ));
-        }
-
-        infos.push(zeroed::<zend_internal_arg_info>());
-
         let raw_handler = handler.as_ref().map(|_| invoke as _);
 
         if let Some(handler) = handler {
@@ -152,7 +137,7 @@ impl FunctionEntry {
                 callable: Rc::into_raw(handler),
             };
             let last_arg_info: zend_internal_arg_info = translator.internal_arg_info;
-            infos.push(last_arg_info);
+            // infos.push(last_arg_info);
         }
 
         let flags = visibility.unwrap_or(Visibility::default() as u32);
@@ -160,8 +145,8 @@ impl FunctionEntry {
         zend_function_entry {
             fname: name.as_ptr().cast(),
             handler: raw_handler,
-            arg_info: Box::into_raw(infos.into_boxed_slice()).cast(),
-            num_args: arguments.len() as u32,
+            arg_info: null_mut(),
+            num_args: 0u32,
             flags,
         }
     }
@@ -171,31 +156,17 @@ impl FunctionEntry {
 pub struct FunctionEntity {
     name: CString,
     handler: Rc<dyn Callable>,
-    arguments: Vec<Argument>,
+    arguments: *const zend_internal_arg_info,
 }
 
 impl FunctionEntity {
     #[inline]
-    pub(crate) fn new(name: impl AsRef<str>, handler: Rc<dyn Callable>) -> Self {
+    pub(crate) fn new(name: impl AsRef<str>, handler: Rc<dyn Callable>, arguments: *const zend_internal_arg_info) -> Self {
         FunctionEntity {
             name: ensure_end_with_zero(name),
             handler,
-            arguments: Default::default(),
+            arguments,
         }
-    }
-
-    /// Add single function argument info.
-    #[inline]
-    pub fn argument(&mut self, argument: Argument) -> &mut Self {
-        self.arguments.push(argument);
-        self
-    }
-
-    /// Add many function argument infos.
-    #[inline]
-    pub fn arguments(&mut self, arguments: impl IntoIterator<Item = Argument>) -> &mut Self {
-        self.arguments.extend(arguments);
-        self
     }
 }
 
@@ -203,7 +174,7 @@ impl FunctionEntity {
 pub struct MethodEntity {
     name: CString,
     handler: Option<Rc<dyn Callable>>,
-    arguments: Vec<Argument>,
+    arguments: *const zend_internal_arg_info,
     visibility: RawVisibility,
 }
 
@@ -213,12 +184,13 @@ impl MethodEntity {
         name: impl AsRef<str>,
         handler: Option<Rc<dyn Callable>>,
         visibility: Visibility,
+        arguments: *const zend_internal_arg_info,
     ) -> Self {
         Self {
             name: ensure_end_with_zero(name),
             handler,
             visibility: visibility as RawVisibility,
-            arguments: Default::default(),
+            arguments,
         }
     }
 
@@ -234,68 +206,6 @@ impl MethodEntity {
         self
     }
 
-    /// Add single method argument info.
-    #[inline]
-    pub fn argument(&mut self, argument: Argument) -> &mut Self {
-        self.arguments.push(argument);
-        self
-    }
-
-    /// Add many method argument infos.
-    #[inline]
-    pub fn arguments(&mut self, arguments: impl IntoIterator<Item = Argument>) -> &mut Self {
-        self.arguments.extend(arguments);
-        self
-    }
-}
-
-/// Function or method argument info.
-pub struct Argument {
-    name: CString,
-    pass_by_ref: bool,
-    required: bool,
-}
-
-impl Argument {
-    /// Indicate the argument is pass by value.
-    pub fn by_val(name: impl AsRef<str>) -> Self {
-        let name = ensure_end_with_zero(name);
-        Self {
-            name,
-            pass_by_ref: false,
-            required: true,
-        }
-    }
-
-    /// Indicate the argument is pass by reference.
-    pub fn by_ref(name: impl AsRef<str>) -> Self {
-        let name = ensure_end_with_zero(name);
-        Self {
-            name,
-            pass_by_ref: true,
-            required: true,
-        }
-    }
-
-    /// Indicate the argument is pass by value and is optional.
-    pub fn by_val_optional(name: impl AsRef<str>) -> Self {
-        let name = ensure_end_with_zero(name);
-        Self {
-            name,
-            pass_by_ref: false,
-            required: false,
-        }
-    }
-
-    /// Indicate the argument is pass by reference nad is optional.
-    pub fn by_ref_optional(name: impl AsRef<str>) -> Self {
-        let name = ensure_end_with_zero(name);
-        Self {
-            name,
-            pass_by_ref: true,
-            required: false,
-        }
-    }
 }
 
 /// Wrapper of [`zend_function`].

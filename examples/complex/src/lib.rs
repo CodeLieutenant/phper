@@ -11,13 +11,13 @@
 use phper::{
     arrays::ZArray,
     classes::{entity::ClassEntity, Visibility},
-    arguments::Argument,
     ini::{ini_get, Policy},
     modules::Module,
     objects::StateObj,
     php_get_module,
     values::ZVal,
 };
+use std::ptr::null;
 use std::{convert::Infallible, ffi::CStr};
 
 fn say_hello(arguments: &mut [ZVal]) -> phper::Result<String> {
@@ -57,44 +57,44 @@ pub fn get_module() -> Module {
 
     // register functions
     module
-        .add_function("complex_say_hello", say_hello)
-        .argument(Argument::by_val("name"));
-    module.add_function("complex_throw_exception", throw_exception);
-    module.add_function("complex_get_all_ini", |_: &mut [ZVal]| {
-        let mut arr = ZArray::new();
+        .add_function("Comples\\say_hello", arginfo_Complex_say_hello, say_hello);
+        // .add_function("complex_throw_exception", null(), throw_exception)
+        // .add_function("complex_get_all_ini", null(), |_: &mut [ZVal]| {
+        //     let mut arr = ZArray::new();
+        //
+        //     let complex_enable = ZVal::from(ini_get::<bool>("complex.enable"));
+        //     arr.insert("complex.enable", complex_enable);
+        //
+        //     let complex_description = ZVal::from(ini_get::<Option<&CStr>>("complex.description"));
+        //     arr.insert("complex.description", complex_description);
+        //     Ok::<_, Infallible>(arr)
+        // });
 
-        let complex_enable = ZVal::from(ini_get::<bool>("complex.enable"));
-        arr.insert("complex.enable", complex_enable);
-
-        let complex_description = ZVal::from(ini_get::<Option<&CStr>>("complex.description"));
-        arr.insert("complex.description", complex_description);
-        Ok::<_, Infallible>(arr)
-    });
-
-    // register classes
-    let mut foo_class = ClassEntity::new("FooClass");
-    foo_class.add_property("foo", Visibility::Private, 100);
-    foo_class.add_method(
-        "getFoo",
-        Visibility::Public,
-        |this: &mut StateObj, _: &mut [ZVal]| {
-            let prop = this.get_property("foo");
-            Ok::<_, phper::Error>(prop.clone())
-        },
-    );
-    foo_class
-        .add_method(
-            "setFoo",
-            Visibility::Public,
-            |this: &mut StateObj, arguments: &mut [ZVal]| -> phper::Result<()> {
-                this.set_property("foo", arguments[0].clone());
-                Ok(())
-            },
-        )
-        .argument(Argument::by_val("foo"));
+    //
+    // // register classes
+    // let mut foo_class = ClassEntity::new("FooClass");
+    // foo_class.add_property("foo", Visibility::Private, 100);
+    // foo_class.add_method(
+    //     "getFoo",
+    //     Visibility::Public,
+    //     |this: &mut StateObj, _: &mut [ZVal]| {
+    //         let prop = this.get_property("foo");
+    //         Ok::<_, phper::Error>(prop.clone())
+    //     },
+    // );
+    // foo_class
+    //     .add_method(
+    //         "setFoo",
+    //         Visibility::Public,
+    //         |this: &mut StateObj, arguments: &mut [ZVal]| -> phper::Result<()> {
+    //             this.set_property("foo", arguments[0].clone());
+    //             Ok(())
+    //         },
+    //     )
+    //     .argument(Argument::by_val("foo"));
     module.add_class(foo_class);
-
-    // register extra info
+    //
+    // // register extra info
     module.add_info("extra info key", "extra info value");
 
     module

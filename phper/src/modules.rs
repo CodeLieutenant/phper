@@ -218,29 +218,31 @@ impl Module {
     }
 
     /// Register function to module.
-    pub fn add_function<F, Z, E>(
-        &mut self,
-        name: impl AsRef<str>,
-        handler: F,
-    ) -> &mut FunctionEntity
+    pub fn add_function<F, Z, E>(&mut self, name: impl AsRef<str>, arguments: *const zend_internal_arg_info, handler: F) -> &mut Self
     where
         F: Fn(&mut [ZVal]) -> Result<Z, E> + 'static,
         Z: Into<ZVal> + 'static,
         E: Throwable + 'static,
     {
-        self.function_entities
-            .push(FunctionEntity::new(name, Rc::new(Function::new(handler))));
-        self.function_entities.last_mut().unwrap()
+        let entry = FunctionEntity::new(name, Rc::new(Function::new(handler)), arguments);
+
+        self.function_entities.push(entry);
+
+        self
     }
 
     /// Register class to module.
-    pub fn add_class(&mut self, class: ClassEntity) {
+    pub fn add_class(&mut self, class: ClassEntity) -> &mut Self {
         self.entities.push(Entities::Class(class));
+
+        self
     }
 
     /// Register interface to module.
-    pub fn add_interface(&mut self, interface: InterfaceEntity) {
+    pub fn add_interface(&mut self, interface: InterfaceEntity) -> &mut Self {
         self.entities.push(Entities::Interface(interface));
+
+        self
     }
 
     /// Register constant to module.
@@ -249,9 +251,11 @@ impl Module {
         name: impl AsRef<str>,
         value: impl Into<ZVal>,
         flags: Option<constants::Flags>,
-    ) {
+    ) -> &mut Self {
         self.entities
             .push(Entities::Constant(Constant::new(name, value, flags)));
+
+        self
     }
 
     /// Register ini configuration to module.
@@ -260,7 +264,7 @@ impl Module {
         name: impl AsRef<str>,
         default_value: impl ini::IntoIniValue,
         policy: ini::Policy,
-    ) {
+    ) -> &mut Self {
         let ini = ini::create_ini_entry_ex(
             name.as_ref(),
             default_value.into_ini_value(),
@@ -268,6 +272,8 @@ impl Module {
             Option::<()>::None,
         );
         self.ini_entities.push(ini);
+
+        self
     }
 
     /// Register info item.
@@ -275,10 +281,12 @@ impl Module {
     /// # Panics
     ///
     /// Panic if key or value contains '\0'.
-    pub fn add_info(&mut self, key: impl Into<String>, value: impl Into<String>) {
+    pub fn add_info(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
         let key = CString::new(key.into()).expect("key contains '\0'");
         let value = CString::new(value.into()).expect("value contains '\0'");
         self.infos.insert(key, value);
+
+        self
     }
 
     #[doc(hidden)]
@@ -320,9 +328,9 @@ impl Module {
             version: module.version.as_ptr(),
             globals_size: 0,
             #[cfg(phper_zts)]
-            globals_id_ptr: std::ptr::null_mut(),
+            globals_id_ptr: null_mut(),
             #[cfg(not(phper_zts))]
-            globals_ptr: std::ptr::null_mut(),
+            globals_ptr: null_mut(),
             globals_ctor: None,
             globals_dtor: None,
             post_deactivate_func: None,

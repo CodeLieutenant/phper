@@ -21,3 +21,5 @@ license = { workspace = true }
 
 [dependencies]
 phper-sys = { workspace = true }
+bindgen = "0.69.4"
+walkdir = "2"

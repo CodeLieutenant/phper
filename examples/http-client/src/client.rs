@@ -12,7 +12,6 @@ use crate::{errors::HttpClientError, request::REQUEST_BUILDER_CLASS};
 use phper::{
     alloc::ToRefOwned,
     classes::{entity::ClassEntity, StaticStateClass, Visibility},
-    arguments::Argument,
 };
 use reqwest::blocking::{Client, ClientBuilder};
 use std::{convert::Infallible, mem::take, time::Duration};
@@ -38,8 +37,8 @@ pub fn make_client_builder_class() -> ClassEntity {
             let builder: ClientBuilder = take(state);
             *state = builder.timeout(Duration::from_millis(ms as u64));
             Ok::<_, phper::Error>(this.to_ref_owned())
-        })
-        .argument(Argument::by_val("ms"));
+        });
+        // .argument(Argument::by_val("ms"));
 
     // Inner call the `ClientBuilder::cookie_store`.
     class
@@ -49,8 +48,8 @@ pub fn make_client_builder_class() -> ClassEntity {
             let builder: ClientBuilder = take(state);
             *state = builder.cookie_store(enable);
             Ok::<_, phper::Error>(this.to_ref_owned())
-        })
-        .argument(Argument::by_val("enable"));
+        });
+        // .argument(Argument::by_val("enable"));
 
     // Inner call the `ClientBuilder::build`, and wrap the result `Client` in
     // Object.
@@ -83,8 +82,8 @@ pub fn make_client_class() -> ClassEntity {
             let mut object = REQUEST_BUILDER_CLASS.init_object()?;
             *object.as_mut_state() = Some(request_builder);
             Ok::<_, phper::Error>(object)
-        })
-        .argument(Argument::by_val("url"));
+        });
+        // .argument(Argument::by_val("url"));
 
     class
         .add_method("post", Visibility::Public, |this, arguments| {
@@ -94,8 +93,8 @@ pub fn make_client_class() -> ClassEntity {
             let mut object = REQUEST_BUILDER_CLASS.init_object()?;
             *object.as_mut_state() = Some(request_builder);
             Ok::<_, phper::Error>(object)
-        })
-        .argument(Argument::by_val("url"));
+        });
+        // .argument(Argument::by_val("url"));
 
     class
 }

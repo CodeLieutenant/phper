@@ -11,7 +11,6 @@
 #![warn(rust_2018_idioms)]
 #![warn(clippy::dbg_macro, clippy::print_stdout)]
 #![doc = include_str!("../README.md")]
-// #![feature(unboxed_closures)]
 
 #[macro_use]
 mod macros;

@@ -20,21 +20,8 @@ use std::{
 };
 
 use phper_sys::*;
+use crate::ini::Stage;
 
-/// Get the global registered configuration value.
-///
-/// # Examples
-///
-/// ```no_run
-/// use phper::ini::ini_get;
-/// use std::ffi::CStr;
-///
-/// let _foo = ini_get::<bool>("FOO");
-/// let _bar = ini_get::<Option<&CStr>>("BAR");
-/// ```
-pub fn ini_get<T: FromIniValue>(name: &str) -> T {
-    T::from_ini_value(name)
-}
 
 /// Configuration changeable policy.
 #[repr(u32)]
@@ -46,28 +33,11 @@ pub enum Policy {
     /// Windows registry. Entry can be set in `.user.ini`.
     User = PHP_INI_USER,
     /// Entry can be set in `php.ini`, `.htaccess`, `httpd.conf` or `.user.ini`.
-    Perdir = PHP_INI_PERDIR,
+    PerDir = PHP_INI_PERDIR,
     /// Entry can be set in `php.ini` or `httpd.conf`.
     System = PHP_INI_SYSTEM,
 }
 
-/// Configuration for INI Stage.
-#[repr(i32)]
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub enum Stage {
-    /// INI Load Event -> Startup -> PHP Started
-    Startup = ZEND_INI_STAGE_STARTUP as i32,
-    /// INI Event -> PHP Shutting down
-    Shutdown = ZEND_INI_STAGE_SHUTDOWN as i32,
-    /// INI Event -> PHP Module Activated
-    Activate = ZEND_INI_STAGE_ACTIVATE as i32,
-    /// INI Event -> PHP Module Deactivated
-    Deactivate = ZEND_INI_STAGE_DEACTIVATE as i32,
-    /// INI Event -> Value changed with ini_set from PHP
-    Runtime = ZEND_INI_STAGE_RUNTIME as i32,
-    /// INI Event -> Value changed from .htaccess file with php_ini directive
-    Htacces = ZEND_INI_STAGE_HTACCESS as i32,
-}
 
 /// The Type which can transform to an ini value.
 pub trait IntoIniValue {
@@ -80,37 +50,6 @@ enum PHPIniFunction<T> {
 
     DefaultValue(unsafe extern "C" fn(*const c_char, usize, c_int) -> T),
 }
-
-macro_rules! try_from_stage_int {
-    ($arg:ty) => {
-        impl TryFrom<$arg> for Stage {
-            type Error = Box<dyn std::error::Error>;
-
-            fn try_from(value: $arg) -> Result<Self, Self::Error> {
-                match value as u32 {
-                    ZEND_INI_STAGE_STARTUP => Ok(Stage::Startup),
-                    ZEND_INI_STAGE_SHUTDOWN => Ok(Stage::Shutdown),
-                    ZEND_INI_STAGE_ACTIVATE => Ok(Stage::Activate),
-                    ZEND_INI_STAGE_DEACTIVATE => Ok(Self::Deactivate),
-                    ZEND_INI_STAGE_RUNTIME => Ok(Stage::Runtime),
-                    ZEND_INI_STAGE_HTACCESS => Ok(Stage::Htacces),
-                    _ => Err("Invalid Zend Stage for INI values".into()),
-                }
-            }
-        }
-    };
-}
-
-try_from_stage_int!(i8);
-try_from_stage_int!(i16);
-try_from_stage_int!(i32);
-try_from_stage_int!(i64);
-try_from_stage_int!(isize);
-try_from_stage_int!(u8);
-try_from_stage_int!(u16);
-try_from_stage_int!(u32);
-try_from_stage_int!(u64);
-try_from_stage_int!(usize);
 
 impl IntoIniValue for bool {
     #[inline]
@@ -297,7 +236,7 @@ unsafe extern "C" fn on_modify<T: OnModify>(
 
 /// On INI Change Trait
 pub trait OnModify {
-    /// Called whenever INI has chaged
+    /// Called whenever INI has changed
     fn on_modify(
         &mut self,
         entry: Entry,

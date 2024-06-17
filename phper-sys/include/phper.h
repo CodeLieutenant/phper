@@ -71,6 +71,16 @@ void phper_separate_string(zval *zv);
 void phper_separate_zval(zval *zv);
 
 // ==================================================
+// constants apis:
+// ==================================================
+zend_result phper_register_constant(zend_constant *constant, int flags,
+                                    int module_number);
+
+zend_constant phper_create_constant(const char *name, size_t name_len, zval val,
+                                    int flags);
+
+
+// ==================================================
 // string apis:
 // ==================================================
 zend_string *phper_zend_new_interned_string(zend_string *str);
@@ -192,7 +202,8 @@ bool phper_zend_str_exists(HashTable *ht, const char *str, size_t len);
 // object apis:
 // ==================================================
 
-zval *phper_get_this(const zend_execute_data *execute_data);
+const zval *phper_get_this(const zend_execute_data *execute_data);
+zval *phper_get_this_mut(zend_execute_data *execute_data);
 size_t phper_zend_object_properties_size(const zend_class_entry *ce);
 void *phper_zend_object_alloc(size_t obj_size, const zend_class_entry *ce);
 bool phper_object_init_ex(zval *arg, const zend_class_entry *class_type);
@@ -252,21 +263,3 @@ int phper_zend_register_list_destructors_ex(const rsrc_dtor_func_t dtor,
 int phper_zend_fetch_list_dtor_id(const char *name);
 const zend_resource *phper_register_persistent_find(const char *hash,
                                                     size_t len);
-
-// ==================================================
-// Argument API:
-// ==================================================
-
-zend_internal_arg_info
-phper_zend_begin_arg_info_ex(bool return_reference,
-                             uintptr_t required_num_args);
-zend_internal_arg_info phper_zend_arg_info(bool pass_by_ref, const char *name);
-
-// ==================================================
-// Constants API:
-// ==================================================
-zend_constant phper_create_constant(const char *name, size_t name_len, zval val,
-                                    int flags);
-
-zend_result phper_register_constant(zend_constant *constant, int flags,
-                                    int module_number);

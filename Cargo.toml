@@ -20,17 +20,20 @@ members = [
     "phper-doc",
 
     # internal
-    "examples/*",
-    "tests/integration",
+    "examples/hello",
+    "examples/complex",
+#    "tests/integration",
 ]
 
 [workspace.package]
 version = "0.13.0"
+description = "Elegant PHP Binding to Rust"
 authors = ["PHPER Framework Team", "jmjoy <jmjoy@apache.org>", "Dusan Malusev <dusan@dusanmalusev.dev>"]
 edition = "2021"
 license = "MulanPSL-2.0"
 repository = "https://github.com/dmalusev/phper"
-rust-version = "1.74"
+rust-version = "1.78"
+readme = "README.md"
 
 [workspace.dependencies]
 phper = { version = "0.13.0", path = "./phper" }

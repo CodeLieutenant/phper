@@ -12,7 +12,10 @@
 #![warn(clippy::dbg_macro)]
 #![doc = include_str!("../README.md")]
 
+use bindgen::Builder;
 use phper_sys::*;
+use std::ffi::OsStr;
+use walkdir::WalkDir;
 
 /// Register all php build relative configure parameters, used in `build.rs`.
 pub fn register_all() {
@@ -51,5 +54,27 @@ pub fn register_link_args() {
     {
         println!("cargo:rustc-link-arg=-undefined");
         println!("cargo:rustc-link-arg=dynamic_lookup");
+    }
+}
+
+/// Includes php bindings for function/method arguments
+pub fn generate_php_function_args(output_dir: &str, dirs: &[&str]) {
+    for dir in dirs {
+        let walk = WalkDir::new(dir).max_depth(12).follow_links(false);
+ 
+        walk.into_iter()
+            .filter_entry(|entry| {
+                entry.file_type().is_file() && entry.path().extension() == Some(OsStr::new("h"))
+            })
+            .for_each(|item| println!("{}", item.unwrap().path().display()));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_generate_function_args() {
+        generate_php_function_args(".", &["."]);
     }
 }

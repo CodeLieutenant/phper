@@ -1,4 +1,5 @@
 use std::{any::Any, marker::PhantomData, mem::zeroed, ptr::null_mut, rc::Rc};
+use std::ptr::null;
 
 use phper_sys::{
     phper_init_class_entry, phper_register_class_entry, zend_class_entry, zend_class_implements,
@@ -108,6 +109,7 @@ impl ClassEntity {
             name,
             Some(Rc::new(Method::<F, Z, E>::new(handler))),
             vis,
+            null(),
         ));
         self.method_entities.last_mut().unwrap()
     }
@@ -124,7 +126,7 @@ impl ClassEntity {
         Z: Into<ZVal> + 'static,
         E: Throwable + 'static,
     {
-        let mut entity = MethodEntity::new(name, Some(Rc::new(Function::new(handler))), vis);
+        let mut entity = MethodEntity::new(name, Some(Rc::new(Function::new(handler))), vis, null());
         entity.set_vis_static();
         self.method_entities.push(entity);
         self.method_entities.last_mut().unwrap()
@@ -136,7 +138,7 @@ impl ClassEntity {
         name: impl AsRef<str>,
         vis: Visibility,
     ) -> &mut MethodEntity {
-        let mut entity = MethodEntity::new(name, None, vis);
+        let mut entity = MethodEntity::new(name, None, vis, null());
         entity.set_vis_abstract();
         self.method_entities.push(entity);
         self.method_entities.last_mut().unwrap()
@@ -183,6 +185,7 @@ impl ClassEntity {
     ///
     /// ```no_run
     /// use phper::classes::{ClassEntity, ClassEntry};
+    /// use phper::classes::entity::ClassEntity;
     ///
     /// let mut class = ClassEntity::new("MyException");
     /// class.extends(|| ClassEntry::from_globals("Exception").unwrap());
