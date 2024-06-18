@@ -218,7 +218,7 @@ impl Module {
     }
 
     /// Register function to module.
-    pub fn add_function<F, Z, E>(&mut self, name: impl AsRef<str>, arguments: *const zend_internal_arg_info, handler: F) -> &mut Self
+    pub fn add_function<F, Z, E>(&mut self, name: impl AsRef<str>, arguments: &'static [zend_internal_arg_info], handler: F) -> &mut Self
     where
         F: Fn(&mut [ZVal]) -> Result<Z, E> + 'static,
         Z: Into<ZVal> + 'static,

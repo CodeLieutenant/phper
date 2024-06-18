@@ -1,5 +1,4 @@
 use std::{any::Any, marker::PhantomData, mem::zeroed, ptr::null_mut, rc::Rc};
-use std::ptr::null;
 
 use phper_sys::{
     phper_init_class_entry, phper_register_class_entry, zend_class_entry, zend_class_implements,
@@ -7,8 +6,7 @@ use phper_sys::{
 };
 
 use crate::{
-    errors::Throwable,
-    functions::{Function, FunctionEntry, Method, MethodEntity},
+    functions::{FunctionEntry, MethodEntity},
     objects::StateObj,
     types::Scalar,
     values::ZVal,
@@ -94,55 +92,55 @@ impl ClassEntity {
     }
 
     /// Add member method to class, with visibility and method handler.
-    pub fn add_method<F, Z, E>(
-        &mut self,
-        name: impl AsRef<str>,
-        vis: Visibility,
-        handler: F,
-    ) -> &mut MethodEntity
-    where
-        F: Fn(&mut StateObj, &mut [ZVal]) -> Result<Z, E> + 'static,
-        Z: Into<ZVal> + 'static,
-        E: Throwable + 'static,
-    {
-        self.method_entities.push(MethodEntity::new(
-            name,
-            Some(Rc::new(Method::<F, Z, E>::new(handler))),
-            vis,
-            null(),
-        ));
-        self.method_entities.last_mut().unwrap()
-    }
+    // pub fn add_method<F, Z, E>(
+    //     &mut self,
+    //     name: impl AsRef<str>,
+    //     vis: Visibility,
+    //     handler: F,
+    // ) -> &mut MethodEntity
+    // where
+    //     F: Fn(&mut StateObj, &mut [ZVal]) -> Result<Z, E> + 'static,
+    //     Z: Into<ZVal> + 'static,
+    //     E: Throwable + 'static,
+    // {
+    //     self.method_entities.push(MethodEntity::new(
+    //         name,
+    //         Some(Rc::new(Method::<F, Z, E>::new(handler))),
+    //         vis,
+    //         null(),
+    //     ));
+    //     self.method_entities.last_mut().unwrap()
+    // }
 
     /// Add static method to class, with visibility and method handler.
-    pub fn add_static_method<F, Z, E>(
-        &mut self,
-        name: impl AsRef<str>,
-        vis: Visibility,
-        handler: F,
-    ) -> &mut MethodEntity
-    where
-        F: Fn(&mut [ZVal]) -> Result<Z, E> + 'static,
-        Z: Into<ZVal> + 'static,
-        E: Throwable + 'static,
-    {
-        let mut entity = MethodEntity::new(name, Some(Rc::new(Function::new(handler))), vis, null());
-        entity.set_vis_static();
-        self.method_entities.push(entity);
-        self.method_entities.last_mut().unwrap()
-    }
+    // pub fn add_static_method<F, Z, E>(
+    //     &mut self,
+    //     name: impl AsRef<str>,
+    //     vis: Visibility,
+    //     handler: F,
+    // ) -> &mut MethodEntity
+    // where
+    //     F: Fn(&mut [ZVal]) -> Result<Z, E> + 'static,
+    //     Z: Into<ZVal> + 'static,
+    //     E: Throwable + 'static,
+    // {
+    //     let mut entity = MethodEntity::new(name, Some(Rc::new(Function::new(handler))), vis, null());
+    //     entity.set_vis_static();
+    //     self.method_entities.push(entity);
+    //     self.method_entities.last_mut().unwrap()
+    // }
 
     /// Add abstract method to class, with visibility (shouldn't be private).
-    pub fn add_abstract_method(
-        &mut self,
-        name: impl AsRef<str>,
-        vis: Visibility,
-    ) -> &mut MethodEntity {
-        let mut entity = MethodEntity::new(name, None, vis, null());
-        entity.set_vis_abstract();
-        self.method_entities.push(entity);
-        self.method_entities.last_mut().unwrap()
-    }
+    // pub fn add_abstract_method(
+    //     &mut self,
+    //     name: impl AsRef<str>,
+    //     vis: Visibility,
+    // ) -> &mut MethodEntity {
+    //     let mut entity = MethodEntity::new(name, None, vis, null());
+    //     entity.set_vis_abstract();
+    //     self.method_entities.push(entity);
+    //     self.method_entities.last_mut().unwrap()
+    // }
 
     /// Declare property.
     ///

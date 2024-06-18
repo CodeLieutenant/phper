@@ -8,17 +8,21 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+mod args_bindings;
+
+use std::convert::Infallible;
+use std::ffi::CStr;
+
+use args_bindings::{arginfo_Complex_say_hello, arginfo_Complex_throw_exception, arginfo_Complex_get_all_ini};
+
+use phper::arrays::ZArray;
+use phper::ini::{ini_get, Policy};
 use phper::{
-    arrays::ZArray,
-    classes::{entity::ClassEntity, Visibility},
-    ini::{ini_get, Policy},
     modules::Module,
-    objects::StateObj,
     php_get_module,
     values::ZVal,
+    zend_args,
 };
-use std::ptr::null;
-use std::{convert::Infallible, ffi::CStr};
 
 fn say_hello(arguments: &mut [ZVal]) -> phper::Result<String> {
     let name = &mut arguments[0];
@@ -56,19 +60,22 @@ pub fn get_module() -> Module {
     module.on_request_shutdown(|_info| {});
 
     // register functions
-    module
-        .add_function("Comples\\say_hello", arginfo_Complex_say_hello, say_hello);
-        // .add_function("complex_throw_exception", null(), throw_exception)
-        // .add_function("complex_get_all_ini", null(), |_: &mut [ZVal]| {
-        //     let mut arr = ZArray::new();
-        //
-        //     let complex_enable = ZVal::from(ini_get::<bool>("complex.enable"));
-        //     arr.insert("complex.enable", complex_enable);
-        //
-        //     let complex_description = ZVal::from(ini_get::<Option<&CStr>>("complex.description"));
-        //     arr.insert("complex.description", complex_description);
-        //     Ok::<_, Infallible>(arr)
-        // });
+    module.add_function(
+        "Comples\\say_hello",
+        zend_args!(arginfo_Complex_say_hello),
+        say_hello,
+    )
+    .add_function("Complex\\throw_exception", zend_args!(arginfo_Complex_throw_exception), throw_exception)
+    .add_function("Comples\\get_all_ini", zend_args!(arginfo_Complex_get_all_ini), |_: &mut [ZVal]| {
+        let mut arr = ZArray::new();
+
+        let complex_enable = ZVal::from(ini_get::<bool>("complex.enable"));
+        arr.insert("complex.enable", complex_enable);
+
+        let complex_description = ZVal::from(ini_get::<Option<&CStr>>("complex.description"));
+        arr.insert("complex.description", complex_description);
+        Ok::<_, Infallible>(arr)
+    });
 
     //
     // // register classes
@@ -92,7 +99,7 @@ pub fn get_module() -> Module {
     //         },
     //     )
     //     .argument(Argument::by_val("foo"));
-    module.add_class(foo_class);
+    // module.add_class(foo_class);
     //
     // // register extra info
     module.add_info("extra info key", "extra info value");

@@ -21,7 +21,7 @@ use super::find_global_class_entry_ptr;
 #[repr(transparent)]
 pub struct ClassEntry {
     inner: zend_class_entry,
-    _p: PhantomData<*mut ()>,
+    _p: PhantomData<*mut zend_class_entry>,
 }
 
 impl ClassEntry {

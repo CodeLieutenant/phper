@@ -22,6 +22,7 @@ use crate::{
     types::Scalar,
     values::ZVal,
 };
+use std::ptr::null;
 use std::{
     any::Any,
     convert::TryInto,
@@ -31,7 +32,6 @@ use std::{
     slice,
     sync::atomic::{AtomicPtr, Ordering},
 };
-use std::ptr::null;
 
 use self::entry::ClassEntry;
 
@@ -200,8 +200,12 @@ impl InterfaceEntity {
 
     /// Add member method to interface, with mandatory visibility public
     /// abstract.
-    pub fn add_method(&mut self, name: impl AsRef<str>) -> &mut MethodEntity {
-        let mut entity = MethodEntity::new(name, None, Visibility::Public, null());
+    pub fn add_method(
+        &mut self,
+        name: impl AsRef<str>,
+        args: &'static [zend_internal_arg_info],
+    ) -> &mut MethodEntity {
+        let mut entity = MethodEntity::new(name, None, Visibility::Public, args);
         entity.set_vis_abstract();
         self.method_entities.push(entity);
         self.method_entities.last_mut().unwrap()

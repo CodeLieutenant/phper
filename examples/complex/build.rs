@@ -10,34 +10,17 @@
 
 use std::env;
 use std::path::PathBuf;
-use bindgen::Builder;
-use walkdir::WalkDir;
 
 fn main() {
-    phper_build::register_configures();
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=stubs");
 
-    #[cfg(target_os = "macos")]
-    {
-        println!("cargo:rustc-link-arg=-undefined");
-        println!("cargo:rustc-link-arg=dynamic_lookup");
-    }
+    phper_build::register_all();
 
-    let current_dir = env::current_dir().unwrap();
+    let current_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let stubs = current_dir.join("stubs");
 
 
-    for entry in WalkDir::new(stubs) {
-        println!("{}", entry.unwrap().path().display());
-    }
-
-
-    let mut builder = Builder::default();
-
-    // for dir in PathBuf::from(stubs).iter().map(|include| &include[2..]) {
-    //     println!("cargo:include={}", dir);
-    //     let p = PathBuf::from(dir).join(".*\\.h");
-    //     builder = builder.allowlist_file(p.display().to_string());
-    // }
-
+    phper_build::generate_php_function_args(&out_path, &[&stubs], None).unwrap();
 }

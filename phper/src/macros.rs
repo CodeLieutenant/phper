@@ -133,3 +133,15 @@ macro_rules! sg {
         $crate::sys::sapi_globals.$x
     };
 }
+
+#[macro_export]
+macro_rules! zend_args {
+    ($x:expr) => {
+        unsafe {
+            let val = std::ptr::addr_of!($x);
+            let len = $x.len();
+            let val = std::slice::from_raw_parts(val, len);
+            std::mem::transmute::<_, &'static [phper::sys::zend_internal_arg_info]>(val)
+        };
+    };
+}

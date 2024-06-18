@@ -16,6 +16,7 @@ use crate::{
     sys::*,
     values::ZVal,
 };
+use memoffset::offset_of;
 use phper_alloc::{RefClone, ToRefOwned};
 use std::{
     any::Any,
@@ -28,7 +29,6 @@ use std::{
     ops::{Deref, DerefMut},
     ptr::null_mut,
 };
-use memoffset::offset_of;
 
 /// Wrapper of [zend_object].
 #[repr(transparent)]
@@ -184,33 +184,17 @@ impl ZObj {
     }
 
     /// Set the property by name of object.
-    #[allow(clippy::useless_conversion)]
     pub fn set_property(&mut self, name: impl AsRef<str>, val: impl Into<ZVal>) {
         let name = name.as_ref();
         let mut val = val.into();
         unsafe {
-            #[cfg(phper_major_version = "8")]
-            {
-                zend_update_property(
-                    self.inner.ce,
-                    &mut self.inner,
-                    name.as_ptr().cast(),
-                    name.len().try_into().unwrap(),
-                    val.as_mut_ptr(),
-                )
-            }
-            #[cfg(phper_major_version = "7")]
-            {
-                let mut zv = std::mem::zeroed::<zval>();
-                phper_zval_obj(&mut zv, self.as_mut_ptr());
-                zend_update_property(
-                    self.inner.ce,
-                    &mut zv,
-                    name.as_ptr().cast(),
-                    name.len().try_into().unwrap(),
-                    val.as_mut_ptr(),
-                )
-            }
+            zend_update_property(
+                self.inner.ce,
+                &mut self.inner,
+                name.as_ptr().cast(),
+                name.len(),
+                val.as_mut_ptr(),
+            );
         }
     }
 

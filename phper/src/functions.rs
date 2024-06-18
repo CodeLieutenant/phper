@@ -25,7 +25,7 @@ use phper_alloc::ToRefOwned;
 use std::{
     ffi::{CStr, CString},
     marker::PhantomData,
-    mem::{transmute},
+    mem::transmute,
     ptr::{self, null_mut},
     rc::Rc,
 };
@@ -126,7 +126,7 @@ impl FunctionEntry {
 
     unsafe fn entry(
         name: &CStr,
-        arguments: *const zend_internal_arg_info,
+        arguments: &'static [zend_internal_arg_info],
         handler: Option<Rc<dyn Callable>>,
         visibility: Option<RawVisibility>,
     ) -> zend_function_entry {
@@ -156,12 +156,16 @@ impl FunctionEntry {
 pub struct FunctionEntity {
     name: CString,
     handler: Rc<dyn Callable>,
-    arguments: *const zend_internal_arg_info,
+    arguments: &'static [zend_internal_arg_info],
 }
 
 impl FunctionEntity {
     #[inline]
-    pub(crate) fn new(name: impl AsRef<str>, handler: Rc<dyn Callable>, arguments: *const zend_internal_arg_info) -> Self {
+    pub(crate) fn new(
+        name: impl AsRef<str>,
+        handler: Rc<dyn Callable>,
+        arguments: &'static [zend_internal_arg_info],
+    ) -> Self {
         FunctionEntity {
             name: ensure_end_with_zero(name),
             handler,
@@ -174,7 +178,7 @@ impl FunctionEntity {
 pub struct MethodEntity {
     name: CString,
     handler: Option<Rc<dyn Callable>>,
-    arguments: *const zend_internal_arg_info,
+    arguments: &'static [zend_internal_arg_info],
     visibility: RawVisibility,
 }
 
@@ -184,7 +188,7 @@ impl MethodEntity {
         name: impl AsRef<str>,
         handler: Option<Rc<dyn Callable>>,
         visibility: Visibility,
-        arguments: *const zend_internal_arg_info,
+        arguments: &'static [zend_internal_arg_info],
     ) -> Self {
         Self {
             name: ensure_end_with_zero(name),
@@ -205,7 +209,6 @@ impl MethodEntity {
         self.visibility |= ZEND_ACC_ABSTRACT;
         self
     }
-
 }
 
 /// Wrapper of [`zend_function`].
