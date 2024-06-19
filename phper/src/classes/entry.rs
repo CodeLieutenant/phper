@@ -36,7 +36,9 @@ impl ClassEntry {
     /// Panics if pointer is null.
     #[inline]
     pub unsafe fn from_ptr<'a>(ptr: *const zend_class_entry) -> &'a Self {
-        (ptr as *const Self).as_ref().expect("ptr should't be null")
+        (ptr as *const Self)
+            .as_ref()
+            .expect("ptr shouldn't be null")
     }
 
     /// Wraps a raw pointer, return None if pointer is null.
@@ -74,6 +76,7 @@ impl ClassEntry {
     }
 
     /// Returns a raw pointer wrapped.
+    #[inline]
     pub const fn as_ptr(&self) -> *const zend_class_entry {
         &self.inner
     }
@@ -94,6 +97,7 @@ impl ClassEntry {
     /// let std_class = ClassEntry::from_globals("stdClass").unwrap();
     /// let _obj = std_class.new_object([]).unwrap();
     /// ```
+    #[inline]
     pub fn from_globals(class_name: impl AsRef<str>) -> crate::Result<&'static Self> {
         let name = class_name.as_ref();
         let ptr: *mut Self = find_global_class_entry_ptr(name).cast();
@@ -108,6 +112,7 @@ impl ClassEntry {
     ///
     /// If the `__construct` is private, or protected and the called scope isn't
     /// parent class, it will throw PHP Error.
+    #[inline]
     pub fn new_object(&self, arguments: impl AsMut<[ZVal]>) -> crate::Result<ZObject> {
         let mut object = self.init_object()?;
         object.call_construct(arguments)?;
@@ -117,6 +122,7 @@ impl ClassEntry {
     /// Create the object from class, without calling `__construct`.
     ///
     /// **Be careful when `__construct` is necessary.**
+    #[inline]
     pub fn init_object(&self) -> crate::Result<ZObject> {
         unsafe {
             let ptr = self.as_ptr() as *mut _;
@@ -124,7 +130,7 @@ impl ClassEntry {
             if !phper_object_init_ex(val.as_mut_ptr(), ptr) {
                 Err(InitializeObjectError::new(self.get_name().to_str()?.to_owned()).into())
             } else {
-                // Can't drop val here! Otherwise the object will be dropped too (wasting me a
+                // Can't drop val here! Otherwise, the object will be dropped too (wasting me a
                 // day of debugging time here).
                 let mut val = ManuallyDrop::new(val);
                 let ptr = phper_z_obj_p(val.as_mut_ptr());
@@ -134,11 +140,18 @@ impl ClassEntry {
     }
 
     /// Get the class name.
+    #[inline]
     pub fn get_name(&self) -> &ZStr {
         unsafe { ZStr::from_ptr(self.inner.name) }
     }
 
+    #[inline]
+    pub fn get_name_str(&self) -> &str {
+        unsafe { ZStr::from_ptr(self.inner.name).as_str() }
+    }
+
     /// Detect if the method is exists in class.
+    #[inline]
     pub fn has_method(&self, method_name: &str) -> bool {
         unsafe {
             let function_table = ZArr::from_ptr(&self.inner.function_table);
@@ -147,6 +160,7 @@ impl ClassEntry {
     }
 
     /// Detect if the class is instance of parent class.
+    #[inline]
     pub fn is_instance_of(&self, parent: &ClassEntry) -> bool {
         unsafe { phper_instanceof_function(self.as_ptr(), parent.as_ptr()) }
     }
@@ -155,6 +169,7 @@ impl ClassEntry {
     ///
     /// Return None when static property hasn't register by
     /// [ClassEntity::add_static_property].
+    #[inline]
     pub fn get_static_property(&self, name: impl AsRef<str>) -> Option<&ZVal> {
         let ptr = self.as_ptr() as *mut _;
         let prop = Self::inner_get_static_property(ptr, name);
@@ -166,6 +181,7 @@ impl ClassEntry {
     /// Return `Some(x)` where `x` is the previous value of static property, or
     /// return `None` when static property hasn't register by
     /// [ClassEntity::add_static_property].
+    #[inline]
     pub fn set_static_property(&self, name: impl AsRef<str>, val: impl Into<ZVal>) -> Option<ZVal> {
         let ptr = self.as_ptr() as *mut _;
         let prop = Self::inner_get_static_property(ptr, name);
@@ -173,13 +189,11 @@ impl ClassEntry {
         prop.map(|prop| replace(prop, val.into()))
     }
 
+    #[inline]
     fn inner_get_static_property(scope: *mut zend_class_entry, name: impl AsRef<str>) -> *mut zval {
         let name = name.as_ref();
 
-        unsafe {
-            #[allow(clippy::useless_conversion)]
-            zend_read_static_property(scope, name.as_ptr().cast(), name.len(), true.into())
-        }
+        unsafe { zend_read_static_property(scope, name.as_ptr().cast(), name.len(), true.into()) }
     }
 }
 

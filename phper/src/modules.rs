@@ -19,9 +19,9 @@ use crate::{
     functions::{Function, FunctionEntity, FunctionEntry},
     ini,
     sys::*,
-    utils::ensure_end_with_zero,
     values::ZVal,
 };
+use smallvec::SmallVec;
 use std::{
     collections::HashMap,
     ffi::CString,
@@ -42,6 +42,15 @@ unsafe fn get_module() -> &'static mut Module {
     unsafe { GLOBAL_MODULE.as_mut().unwrap_unchecked() }
 }
 
+/// Safety: This is used as a global variable, initialization is always
+/// guaranteed by PHP to be from one thread in ZTS, and on NTS its always one thread
+struct FEntry(SmallVec<[FunctionEntry; 64]>);
+
+unsafe impl Send for FEntry {}
+unsafe impl Sync for FEntry {}
+
+static mut PHP_FUNCTIONS: FEntry = FEntry(SmallVec::new_const());
+
 /// PHP Module information
 pub struct ModuleInfo {
     /// Module Type
@@ -52,7 +61,7 @@ pub struct ModuleInfo {
 }
 
 pub(crate) trait Registerer {
-    fn register(&mut self, module_number: i32) -> Result<(), Box<dyn std::error::Error>>;
+    fn register(self, module_number: i32) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 unsafe extern "C" fn module_startup(_type: c_int, module_number: c_int) -> c_int {
@@ -61,7 +70,7 @@ unsafe extern "C" fn module_startup(_type: c_int, module_number: c_int) -> c_int
 
     ini::register(take(&mut module.ini_entities), module_number);
 
-    for mut entity in take(&mut module.entities).into_iter() {
+    for entity in take(&mut module.entities).into_iter() {
         if let Err(err) = entity.register(module_number) {
             crate::output::log(
                 crate::output::LogLevel::Error,
@@ -157,7 +166,6 @@ pub struct Module {
     module_shutdown: Option<Box<dyn FnOnce(ModuleInfo)>>,
     request_init: Option<&'static dyn Fn(ModuleInfo)>,
     request_shutdown: Option<&'static dyn Fn(ModuleInfo)>,
-    function_entities: Vec<FunctionEntity>,
     entities: Vec<Entities>,
     ini_entities: Vec<zend_ini_entry_def>,
     infos: HashMap<CString, CString>,
@@ -165,12 +173,12 @@ pub struct Module {
 
 pub(crate) enum Entities {
     Constant(Constant),
-    Class(ClassEntity),
+    Class(ClassEntity<()>),
     Interface(InterfaceEntity),
 }
 
 impl Registerer for Entities {
-    fn register(&mut self, module_number: i32) -> Result<(), Box<dyn std::error::Error>> {
+    fn register(self, module_number: i32) -> Result<(), Box<dyn std::error::Error>> {
         match self {
             Entities::Constant(con) => con.register(module_number),
             Entities::Class(class) => class.register(module_number),
@@ -183,17 +191,12 @@ impl Module {
     /// Construct the `Module` with base metadata.
     pub fn new(name: impl AsRef<str>, version: impl AsRef<str>, author: impl AsRef<str>) -> Self {
         Self {
-            name: ensure_end_with_zero(name),
-            version: ensure_end_with_zero(version),
-            author: ensure_end_with_zero(author),
-            module_init: None,
-            module_shutdown: None,
-            request_init: None,
-            request_shutdown: None,
-            function_entities: vec![],
-            entities: Default::default(),
-            ini_entities: Default::default(),
-            infos: Default::default(),
+            name: CString::new(name.as_ref()).expect("Failed to allocate CString, param: name"),
+            version: CString::new(version.as_ref())
+                .expect("Failed to allocate CString, param: version"),
+            author: CString::new(author.as_ref())
+                .expect("Failed to allocate CString, param: author"),
+            ..Default::default()
         }
     }
 
@@ -218,7 +221,12 @@ impl Module {
     }
 
     /// Register function to module.
-    pub fn add_function<F, Z, E>(&mut self, name: impl AsRef<str>, arguments: &'static [zend_internal_arg_info], handler: F) -> &mut Self
+    pub fn add_function<F, Z, E>(
+        &mut self,
+        name: impl AsRef<str>,
+        arguments: &'static [zend_internal_arg_info],
+        handler: F,
+    ) -> &mut Self
     where
         F: Fn(&mut [ZVal]) -> Result<Z, E> + 'static,
         Z: Into<ZVal> + 'static,
@@ -226,14 +234,20 @@ impl Module {
     {
         let entry = FunctionEntity::new(name, Rc::new(Function::new(handler)), arguments);
 
-        self.function_entities.push(entry);
+        unsafe {
+            PHP_FUNCTIONS
+                .0
+                .push(FunctionEntry::from_function_entity(entry));
+        }
 
         self
     }
 
     /// Register class to module.
-    pub fn add_class(&mut self, class: ClassEntity) -> &mut Self {
-        self.entities.push(Entities::Class(class));
+    pub fn add_class<T>(&mut self, class: ClassEntity<T>) -> &mut Self {
+        self.entities.push(Entities::Class(unsafe {
+            std::mem::transmute::<ClassEntity<T>, ClassEntity<()>>(class)
+        }));
 
         self
     }
@@ -295,12 +309,6 @@ impl Module {
             return GLOBAL_MODULE_ENTRY;
         }
 
-        assert!(!self.name.as_bytes().is_empty(), "module name must be set");
-        assert!(
-            !self.version.as_bytes().is_empty(),
-            "module version must be set"
-        );
-
         let module = Box::leak(Box::new(self));
 
         let entry = Box::new(zend_module_entry {
@@ -347,17 +355,13 @@ impl Module {
         GLOBAL_MODULE_ENTRY
     }
 
-    fn function_entries(&self) -> *const zend_function_entry {
-        if self.function_entities.is_empty() {
+    unsafe fn function_entries(&self) -> *const zend_function_entry {
+        if PHP_FUNCTIONS.0.is_empty() {
             return null();
         }
 
-        let mut entries = Vec::new();
-        for f in &self.function_entities {
-            entries.push(unsafe { FunctionEntry::from_function_entity(f) });
-        }
-        entries.push(unsafe { zeroed::<zend_function_entry>() });
+        PHP_FUNCTIONS.0.push(zeroed::<FunctionEntry>());
 
-        Box::into_raw(entries.into_boxed_slice()).cast()
+        PHP_FUNCTIONS.0.as_ptr() as *const zend_function_entry
     }
 }

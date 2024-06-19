@@ -13,19 +13,23 @@
 pub mod entity;
 /// Zend Class Entry
 pub mod entry;
+pub mod methods;
 pub mod zend_classes;
 
+pub use entity::*;
+pub use methods::MethodEntity;
+
+use crate::classes::methods::MethodEntityBuilder;
 use crate::{
-    functions::{FunctionEntry, MethodEntity},
+    functions::FunctionEntry,
     objects::{StateObj, StateObject, ZObject},
     sys::*,
     types::Scalar,
     values::ZVal,
 };
-use std::ptr::null;
+use smallvec::SmallVec;
 use std::{
     any::Any,
-    convert::TryInto,
     mem::{size_of, zeroed},
     os::raw::c_int,
     ptr::null_mut,
@@ -35,7 +39,7 @@ use std::{
 
 use self::entry::ClassEntry;
 
-#[allow(clippy::useless_conversion)]
+#[inline]
 fn find_global_class_entry_ptr(name: impl AsRef<str>) -> *mut zend_class_entry {
     let name = name.as_ref();
     let name = name.to_lowercase();
@@ -43,7 +47,7 @@ fn find_global_class_entry_ptr(name: impl AsRef<str>) -> *mut zend_class_entry {
         phper_zend_hash_str_find_ptr(
             compiler_globals.class_table,
             name.as_ptr().cast(),
-            name.len().try_into().unwrap(),
+            name.len(),
         )
         .cast()
     }
@@ -76,27 +80,24 @@ fn find_global_class_entry_ptr(name: impl AsRef<str>) -> *mut zend_class_entry {
 ///     class
 /// }
 /// ```
-#[repr(transparent)]
-pub struct StaticStateClass {
-    inner: AtomicPtr<zend_class_entry>,
-}
 
-impl StaticStateClass {
+#[repr(transparent)]
+pub struct StaticStateClass<T>(AtomicPtr<zend_class_entry>, std::marker::PhantomData<T>);
+
+impl<T> StaticStateClass<T> {
     /// Create empty [StaticStateClass], with null
     /// [zend_class_entry].
     pub const fn null() -> Self {
-        Self {
-            inner: AtomicPtr::new(null_mut()),
-        }
+        Self(AtomicPtr::new(null_mut()), std::marker::PhantomData)
     }
 
     fn bind(&'static self, ptr: *mut zend_class_entry) {
-        self.inner.store(ptr, Ordering::Relaxed);
+        self.0.store(ptr, Ordering::Relaxed);
     }
 
     /// Converts to class entry.
     pub fn as_class_entry(&'static self) -> &'static ClassEntry {
-        unsafe { ClassEntry::from_mut_ptr(self.inner.load(Ordering::Relaxed)) }
+        unsafe { ClassEntry::from_mut_ptr(self.0.load(Ordering::Relaxed)) }
     }
 
     /// Create the object from class and call `__construct` with arguments.
@@ -121,7 +122,7 @@ impl StaticStateClass {
     }
 }
 
-unsafe impl Sync for StaticStateClass {}
+unsafe impl<T> Sync for StaticStateClass<T> {}
 
 /// The [StaticInterface]  holds
 /// [zend_class_entry], always as the static
@@ -147,26 +148,23 @@ unsafe impl Sync for StaticStateClass {}
 /// }
 /// ```
 #[repr(transparent)]
-pub struct StaticInterface {
-    inner: AtomicPtr<zend_class_entry>,
-}
+pub struct StaticInterface(AtomicPtr<zend_class_entry>);
 
 impl StaticInterface {
     /// Create empty [StaticInterface], with null
     /// [zend_class_entry].
     pub const fn null() -> Self {
-        Self {
-            inner: AtomicPtr::new(null_mut()),
-        }
+        Self(AtomicPtr::new(null_mut()))
+
     }
 
     fn bind(&'static self, ptr: *mut zend_class_entry) {
-        self.inner.store(ptr, Ordering::Relaxed);
+        self.0.store(ptr, Ordering::Relaxed);
     }
 
     /// Converts to class entry.
     pub fn as_class_entry(&'static self) -> &'static ClassEntry {
-        unsafe { ClassEntry::from_mut_ptr(self.inner.load(Ordering::Relaxed)) }
+        unsafe { ClassEntry::from_mut_ptr(self.0.load(Ordering::Relaxed)) }
     }
 }
 
@@ -177,8 +175,8 @@ pub(crate) type StateCloner = dyn Fn(*const dyn Any) -> *mut dyn Any;
 /// Builder for registering interface.
 pub struct InterfaceEntity {
     interface: zend_class_entry,
-    method_entities: Vec<MethodEntity>,
-    extends: Vec<Box<dyn Fn() -> &'static ClassEntry>>,
+    methods: SmallVec<[FunctionEntry; 16]>,
+    extends: SmallVec<[Box<dyn Fn() -> &'static ClassEntry>; 1]>,
     bind_interface: Option<&'static StaticInterface>,
 }
 
@@ -192,27 +190,20 @@ impl InterfaceEntity {
             interface: unsafe {
                 phper_init_interface_entry(interface_name.as_ptr().cast(), interface_name_len)
             },
-            method_entities: Vec::new(),
-            extends: Vec::new(),
+            methods: SmallVec::default(),
+            extends: SmallVec::default(),
             bind_interface: None,
         }
     }
 
     /// Add member method to interface, with mandatory visibility public
     /// abstract.
-    pub fn add_method(
-        &mut self,
-        name: impl AsRef<str>,
-        args: &'static [zend_internal_arg_info],
-    ) -> &mut MethodEntity {
-        let mut entity = MethodEntity::new(name, None, Visibility::Public, args);
-        entity.set_vis_abstract();
-        self.method_entities.push(entity);
-        self.method_entities.last_mut().unwrap()
+    pub fn add_method(&mut self, builder: MethodEntityBuilder) {
+        self.methods.push(builder.set_abstract().build().into());
     }
 
     /// Register interface to `extends` the interfaces, due to the interface can
-    /// extends multi interface, so this method can be called multi time.
+    /// extend multi interface, so this method can be called multi time.
     ///
     /// *Because in the `MINIT` phase, the class starts to register, so the*
     /// *closure is used to return the `ClassEntry` to delay the acquisition of*
@@ -238,25 +229,15 @@ impl InterfaceEntity {
     pub fn bind(&mut self, i: &'static StaticInterface) {
         self.bind_interface = Some(i);
     }
-
-    unsafe fn function_entries(&self) -> *const zend_function_entry {
-        let mut methods = self
-            .method_entities
-            .iter()
-            .map(|method| FunctionEntry::from_method_entity(method))
-            .collect::<Vec<_>>();
-
-        methods.push(zeroed::<zend_function_entry>());
-
-        Box::into_raw(methods.into_boxed_slice()).cast()
-    }
 }
 
 impl crate::modules::Registerer for InterfaceEntity {
-    fn register(&mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
+    fn register(mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
         unsafe {
+            self.methods.push(zeroed::<FunctionEntry>());
+
             let class_ce =
-                phper_register_interface_entry(&mut self.interface, self.function_entries());
+                phper_register_interface_entry(&mut self.interface, self.methods.as_ptr().cast());
 
             if let Some(bind_interface) = self.bind_interface {
                 bind_interface.bind(class_ce);

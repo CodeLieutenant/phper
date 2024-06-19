@@ -22,6 +22,7 @@ use crate::{
     values::{ExecuteData, ZVal},
 };
 use phper_alloc::ToRefOwned;
+use std::mem::zeroed;
 use std::{
     ffi::{CStr, CString},
     marker::PhantomData,
@@ -29,6 +30,7 @@ use std::{
     ptr::{self, null_mut},
     rc::Rc,
 };
+use crate::classes::MethodEntity;
 
 pub(crate) trait Callable {
     fn call(&self, execute_data: &mut ExecuteData, arguments: &mut [ZVal], return_value: &mut ZVal);
@@ -99,14 +101,15 @@ where
 }
 
 /// Wrapper of [`zend_function_entry`].
-#[repr(transparent)]
-pub struct FunctionEntry {
-    #[allow(dead_code)]
-    inner: zend_function_entry,
-}
+#[repr(C)]
+pub struct FunctionEntry(pub(crate) zend_function_entry);
 
 impl FunctionEntry {
-    pub(crate) unsafe fn from_function_entity(entity: &FunctionEntity) -> zend_function_entry {
+    pub(crate) fn empty() -> Self {
+        Self(unsafe { zeroed::<zend_function_entry>() })
+    }
+
+    pub(crate) unsafe fn from_function_entity(entity: FunctionEntity) -> FunctionEntry {
         Self::entry(
             &entity.name,
             entity.arguments,
@@ -115,7 +118,7 @@ impl FunctionEntry {
         )
     }
 
-    pub(crate) unsafe fn from_method_entity(entity: &MethodEntity) -> zend_function_entry {
+    pub(crate) unsafe fn from_method_entity(entity:  MethodEntity) -> FunctionEntry {
         Self::entry(
             &entity.name,
             entity.arguments,
@@ -129,7 +132,7 @@ impl FunctionEntry {
         arguments: &'static [zend_internal_arg_info],
         handler: Option<Rc<dyn Callable>>,
         visibility: Option<RawVisibility>,
-    ) -> zend_function_entry {
+    ) -> FunctionEntry {
         let raw_handler = handler.as_ref().map(|_| invoke as _);
 
         if let Some(handler) = handler {
@@ -142,13 +145,13 @@ impl FunctionEntry {
 
         let flags = visibility.unwrap_or(Visibility::default() as u32);
 
-        zend_function_entry {
+        FunctionEntry(zend_function_entry {
             fname: name.as_ptr().cast(),
             handler: raw_handler,
             arg_info: null_mut(),
             num_args: 0u32,
             flags,
-        }
+        })
     }
 }
 
@@ -174,42 +177,6 @@ impl FunctionEntity {
     }
 }
 
-/// Builder for registering class method.
-pub struct MethodEntity {
-    name: CString,
-    handler: Option<Rc<dyn Callable>>,
-    arguments: &'static [zend_internal_arg_info],
-    visibility: RawVisibility,
-}
-
-impl MethodEntity {
-    #[inline]
-    pub(crate) fn new(
-        name: impl AsRef<str>,
-        handler: Option<Rc<dyn Callable>>,
-        visibility: Visibility,
-        arguments: &'static [zend_internal_arg_info],
-    ) -> Self {
-        Self {
-            name: ensure_end_with_zero(name),
-            handler,
-            visibility: visibility as RawVisibility,
-            arguments,
-        }
-    }
-
-    #[inline]
-    pub(crate) fn set_vis_static(&mut self) -> &mut Self {
-        self.visibility |= ZEND_ACC_STATIC;
-        self
-    }
-
-    #[inline]
-    pub(crate) fn set_vis_abstract(&mut self) -> &mut Self {
-        self.visibility |= ZEND_ACC_ABSTRACT;
-        self
-    }
-}
 
 /// Wrapper of [`zend_function`].
 #[repr(transparent)]

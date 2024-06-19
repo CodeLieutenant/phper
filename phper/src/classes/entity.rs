@@ -1,3 +1,4 @@
+use smallvec::SmallVec;
 use std::{any::Any, marker::PhantomData, mem::zeroed, ptr::null_mut, rc::Rc};
 
 use phper_sys::{
@@ -5,12 +6,7 @@ use phper_sys::{
     zend_function_entry,
 };
 
-use crate::{
-    functions::{FunctionEntry, MethodEntity},
-    objects::StateObj,
-    types::Scalar,
-    values::ZVal,
-};
+use crate::{functions::FunctionEntry, objects::StateObj, types::Scalar, values::ZVal};
 
 use super::{
     create_object, entry::ClassEntry, PropertyEntity, StateCloner, StateConstructor,
@@ -21,29 +17,29 @@ use super::{
 ///
 /// *It is a common practice for PHP extensions to use PHP objects to package
 /// third-party resources.*
-pub struct ClassEntity {
+pub struct ClassEntity<T> {
     class: zend_class_entry,
     state_constructor: Rc<StateConstructor>,
-    method_entities: Vec<MethodEntity>,
+    method_entities: SmallVec<[FunctionEntry; 16]>,
     property_entities: Vec<PropertyEntity>,
     parent: Option<Box<dyn Fn() -> &'static ClassEntry>>,
     interfaces: Vec<Box<dyn Fn() -> &'static ClassEntry>>,
-    bind_class: Option<&'static StaticStateClass>,
+    bind_class: Option<&'static StaticStateClass<()>>,
     state_cloner: Option<Rc<StateCloner>>,
-    _p: PhantomData<*mut ()>,
+    _p: PhantomData<*mut T>,
 }
 
-impl ClassEntity {
+impl ClassEntity<()> {
     /// Construct a new `ClassEntity` with class name, do not own state.
     pub fn new(class_name: impl AsRef<str>) -> Self {
-        Self::new_with_state_constructor::<()>(class_name, || ())
+        Self::new_with_state_constructor(class_name, || ())
     }
 }
 
-impl ClassEntity {
+impl<T> ClassEntity<T> {
     /// Construct a new `ClassEntity` with class name and default state
     /// constructor.
-    pub fn new_with_default_state_constructor<T>(class_name: impl AsRef<str>) -> Self
+    pub fn new_with_default_state_constructor(class_name: impl AsRef<str>) -> Self
     where
         T: Default + 'static,
     {
@@ -61,10 +57,10 @@ impl<Z, E> Handler<Z, E> for dyn Fn(&mut StateObj, &mut [ZVal]) -> Result<Z, E> 
     }
 }
 
-impl ClassEntity {
+impl<T> ClassEntity<T> {
     /// Construct a new `ClassEntity` with class name and the constructor to
     /// build state.
-    pub fn new_with_state_constructor<T>(
+    pub fn new_with_state_constructor(
         class_name: impl AsRef<str>,
         state_constructor: impl Fn() -> T + 'static,
     ) -> Self
@@ -81,7 +77,7 @@ impl ClassEntity {
                 let boxed = Box::new(state) as Box<dyn Any>;
                 Box::into_raw(boxed)
             }),
-            method_entities: Vec::new(),
+            method_entities: SmallVec::default(),
             property_entities: Vec::new(),
             parent: None,
             interfaces: Vec::new(),
@@ -183,7 +179,6 @@ impl ClassEntity {
     ///
     /// ```no_run
     /// use phper::classes::{ClassEntity, ClassEntry};
-    /// use phper::classes::entity::ClassEntity;
     ///
     /// let mut class = ClassEntity::new("MyException");
     /// class.extends(|| ClassEntry::from_globals("Exception").unwrap());
@@ -219,8 +214,10 @@ impl ClassEntity {
     ///
     /// When the class registered, the [StaticStateClass] will be initialized,
     /// so you can use the [StaticStateClass] to new stateful object, etc.
-    pub fn bind(&mut self, cls: &'static StaticStateClass) {
-        self.bind_class = Some(cls);
+    pub fn bind(&mut self, cls: &'static StaticStateClass<T>) {
+        self.bind_class = Some(unsafe {
+            std::mem::transmute::<&'static StaticStateClass<T>, &'static StaticStateClass<()>>(cls)
+        });
     }
 
     /// Add the state clone function, called when cloning PHP object.
@@ -244,13 +241,16 @@ impl ClassEntity {
     /// ```
     /// use phper::classes::ClassEntity;
     ///
-    /// fn make_foo_class() -> ClassEntity<i64> {
+    /// fn make_foo_class<T>() -> ClassEntity<T> {
     ///     let mut class = ClassEntity::new_with_state_constructor("Foo", || 123456);
     ///     class.state_cloner(Clone::clone);
     ///     class
     /// }
     /// ```
-    pub fn state_cloner<T: 'static>(&mut self, clone_fn: impl Fn(&T) -> T + 'static) {
+    pub fn state_cloner(&mut self, clone_fn: impl Fn(&T) -> T + 'static)
+    where
+        T: 'static,
+    {
         self.state_cloner = Some(Rc::new(move |src| {
             let src = unsafe {
                 src.as_ref()
@@ -263,62 +263,48 @@ impl ClassEntity {
             Box::into_raw(boxed)
         }));
     }
-
-    unsafe fn function_entries(&self) -> *const zend_function_entry {
-        let mut methods = self
-            .method_entities
-            .iter()
-            .map(|method| FunctionEntry::from_method_entity(method))
-            .collect::<Vec<_>>();
-
-        methods.push(zeroed::<zend_function_entry>());
-
-        // Store the state constructor pointer to zend_class_entry.
-        methods.push(self.take_state_constructor_into_function_entry());
-
-        // Store the state cloner pointer to zend_class_entry.
-        methods.push(self.take_state_cloner_into_function_entry());
-
-        Box::into_raw(methods.into_boxed_slice()).cast()
-    }
-
-    unsafe fn take_state_constructor_into_function_entry(&self) -> zend_function_entry {
-        let mut entry = zeroed::<zend_function_entry>();
-        let ptr = &mut entry as *mut _ as *mut *const StateConstructor;
-        let state_constructor = Rc::into_raw(self.state_constructor.clone());
-        ptr.write(state_constructor);
-        entry
-    }
-
-    unsafe fn take_state_cloner_into_function_entry(&self) -> zend_function_entry {
-        let mut entry = zeroed::<zend_function_entry>();
-        let ptr = &mut entry as *mut _ as *mut *const StateCloner;
-        if let Some(state_cloner) = &self.state_cloner {
-            let state_constructor = Rc::into_raw(state_cloner.clone());
-            ptr.write(state_constructor);
-        }
-        entry
-    }
 }
 
-impl crate::modules::Registerer for ClassEntity {
-    fn register(&mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
+impl<T> crate::modules::Registerer for ClassEntity<T> {
+    fn register(mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
         unsafe {
             let parent: *mut zend_class_entry = self
                 .parent
                 .as_ref()
-                .map(|parent| parent())
-                .map(|entry| entry.as_ptr() as *mut _)
+                .map(|parent| parent().as_ptr() as *mut _)
                 .unwrap_or(null_mut());
 
+            let mut methods = std::mem::take(&mut self.method_entities);
+            methods.push(FunctionEntry::empty());
+
+            {
+                let mut entry = zeroed::<zend_function_entry>();
+                let ptr = &mut entry as *mut _ as *mut *const StateConstructor;
+                let state_constructor = Rc::into_raw(self.state_constructor);
+                ptr.write(state_constructor);
+                methods.push(FunctionEntry(entry));
+            }
+
+            // Store the state constructor pointer to zend_class_entry.
+
+            if let Some(state_cloner) = self.state_cloner {
+                let mut entry = zeroed::<zend_function_entry>();
+                let ptr = &mut entry as *mut _ as *mut *const StateCloner;
+                let state_constructor = Rc::into_raw(state_cloner.clone());
+                ptr.write(state_constructor);
+                methods.push(FunctionEntry(entry));
+            }
+
+            // Store the state cloner pointer to zend_class_entry.
+
             let class_ce =
-                phper_register_class_entry(&mut self.class, parent, self.function_entries());
+                phper_register_class_entry(&mut self.class, parent, methods.as_ptr().cast());
 
             if let Some(bind_class) = self.bind_class {
                 bind_class.bind(class_ce);
             }
 
-            for interface in &self.interfaces {
+            for interface in self.interfaces {
                 let interface_ce = interface().as_ptr();
                 zend_class_implements(class_ce, 1, interface_ce);
             }

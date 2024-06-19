@@ -54,7 +54,7 @@ impl Constant {
 }
 
 impl Registerer for Constant {
-    fn register(&mut self, module_number: i32) -> Result<(), Box<dyn std::error::Error>> {
+    fn register(mut self, module_number: i32) -> Result<(), Box<dyn std::error::Error>> {
         let result =
             unsafe { phper_register_constant(&mut self.constant, self.flags, module_number) };
 
