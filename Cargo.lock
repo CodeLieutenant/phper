@@ -1062,6 +1062,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1075,6 +1081,7 @@ dependencies = [
  "derive_more",
  "memoffset",
  "once_cell",
+ "paste",
  "phper-alloc",
  "phper-build",
  "phper-macros",
@@ -1116,6 +1123,7 @@ dependencies = [
 name = "phper-example-complex"
 version = "0.0.0"
 dependencies = [
+ "paste",
  "phper",
  "phper-build",
  "phper-test",

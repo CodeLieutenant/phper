@@ -79,7 +79,6 @@ zend_result phper_register_constant(zend_constant *constant, int flags,
 zend_constant phper_create_constant(const char *name, size_t name_len, zval val,
                                     int flags);
 
-
 // ==================================================
 // string apis:
 // ==================================================
@@ -213,11 +212,10 @@ uint32_t phper_zend_object_gc_refcount(const zend_object *obj);
 // ==================================================
 // class apis:
 // ==================================================
-zend_class_entry phper_init_class_entry(const char *class_name,
-                                        size_t class_name_len);
 zend_class_entry *
-phper_register_class_entry(zend_class_entry *ce, zend_class_entry *parent,
-                           const zend_function_entry *functions);
+phper_register_class_entry(zend_class_entry *(*create_ce)(void),
+                           const zend_function_entry *functions,
+                           zend_object *(*create_object)(zend_class_entry *));
 
 // ==================================================
 // interface apis:
@@ -237,6 +235,10 @@ bool phper_call_user_function(zval *object, zval *function_name,
                               zval *retval_ptr, const zval *params,
                               uint32_t param_count,
                               const HashTable *named_params);
+
+// ==================================================
+// zend params api:
+// ==================================================
 const zval *phper_zend_call_var_num(const zend_execute_data *execute_data,
                                     int index);
 const zval *phper_zend_call_arg(const zend_execute_data *execute_data,

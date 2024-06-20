@@ -15,17 +15,19 @@ use std::ffi::CStr;
 
 use args_bindings::{
     arginfo_Complex_get_all_ini, arginfo_Complex_say_hello, arginfo_Complex_throw_exception,
+    register_class_Complex_Foo,
 };
 
 use phper::arrays::ZArray;
+use phper::classes::ClassEntity;
 use phper::ini::{ini_get, Policy};
-use phper::{modules::Module, php_get_module, values::ZVal, zend_args};
+use phper::{modules::Module, php_get_module, values::ZVal, zend_args, zend_create_fn};
 
 fn say_hello(arguments: &mut [ZVal]) -> phper::Result<String> {
     let name = &mut arguments[0];
     name.convert_to_string();
     let name = name.as_z_str().unwrap().to_str()?;
-    Ok(format!("Hello, {}!\n", name))
+    Ok(format!("Hello, {name}!\n"))
 }
 
 fn throw_exception(_: &mut [ZVal]) -> phper::Result<()> {
@@ -85,7 +87,7 @@ pub fn get_module() -> Module {
 
     //
     // // register classes
-    // let mut foo_class = ClassEntity::new("FooClass");
+    let mut foo_class = ClassEntity::new(zend_create_fn!(register_class_Complex_Foo));
     // foo_class.add_property("foo", Visibility::Private, 100);
     // foo_class.add_method(
     //     "getFoo",

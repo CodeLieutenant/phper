@@ -31,7 +31,10 @@ fn main() {
         .map(|file| file.path().to_string_lossy().to_string())
         .collect::<Vec<_>>();
 
-    println!("cargo:rerun-if-changed={}", current_dir.join("include").join("phper.h").display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        current_dir.join("include").join("phper.h").display()
+    );
 
     c_files
         .iter()

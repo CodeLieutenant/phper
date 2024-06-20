@@ -82,14 +82,11 @@ fn create_builder() -> Result<(Build, Builder), Box<dyn std::error::Error>> {
         .generate_inline_functions(true)
         .generate_block(true)
         .generate_comments(true)
-        .allowlist_type("zend_internal_arg_info")
-        .allowlist_type("zend_type")
-        .allowlist_var("arginfo_*")
         .wrap_unsafe_ops(true)
         .array_pointers_in_arguments(true)
         .generate_cstr(true);
 
-    let mut cc = cc::Build::new();
+    let mut cc = Build::new();
 
     for dir in includes.iter() {
         cc.flag(dir);
@@ -122,18 +119,15 @@ pub fn generate_php_function_args<P: AsRef<Path>, Q: AsRef<Path>>(
     let gen_stub_php = gen_stub_php.as_os_str().to_str().unwrap();
 
     for dir in dirs {
-        let dir_name =  dir.as_ref().to_str().unwrap();
-
-        std::process::Command::new(php_exec.unwrap_or("php"))
-            .args([gen_stub_php, dir_name])
+        Command::new(php_exec.unwrap_or("php"))
+            .args([gen_stub_php, dir.as_ref().to_str().unwrap()])
             .output()?;
     }
 
     let mut header = String::with_capacity(64 * 1024);
     let mut c_file = String::with_capacity(64 * 1024);
-
-    header.push_str("#pragma once\n\n#include <php.h>\n\n",);
-    c_file.push_str("#include <php.h>\n\nBEGIN_EXTERN_C()\n\n");
+    header.push_str("#pragma once\n\n#include <php.h>\n\n");
+    c_file.push_str("#include <php.h>\n\nBEGIN_EXTERN_C()\n#define static\n\n");
 
     for dir in dirs {
         let dir = dir.as_ref();
@@ -154,23 +148,21 @@ pub fn generate_php_function_args<P: AsRef<Path>, Q: AsRef<Path>>(
 
             let contents = std::fs::read_to_string(path)?;
 
-            match extract_arginfo_size_and_name(&contents) {
-                Some(vals) => write_header(&mut header, &vals),
-                None => continue,
+            if extract_headers_and_c_file(&mut header, &mut c_file, contents).is_none() {
+                continue;
             }
 
-            c_file.push_str(&contents);
             std::fs::remove_file(path)?;
         }
     }
 
-    c_file.push_str("END_EXTERN_C()\n\n");
+    c_file.push_str("#undef static\nEND_EXTERN_C()\n");
 
     let php_args_binding_h_path = output_dir.join("php_args_bindings.h");
     std::fs::write(&php_args_binding_h_path, &header)?;
 
     let php_args_binding_c_path = output_dir.join("php_args_bindings.c");
-    std::fs::write(&php_args_binding_c_path, format!("\n\n{}\n\n", c_file))?;
+    std::fs::write(&php_args_binding_c_path, c_file)?;
 
     let (mut cc, builder) = create_builder()?;
 
@@ -187,43 +179,80 @@ pub fn generate_php_function_args<P: AsRef<Path>, Q: AsRef<Path>>(
     Ok(())
 }
 
-fn write_header(header: &mut String, content: &[(&str, usize)]) {
-    content.iter().for_each(|(name, count)| {
-        header.push_str("extern zend_internal_arg_info ");
-        header.push_str(name);
-        header.push('[');
-        header.push_str(count.to_string().as_str());
-        header.push_str("];\n\n");
-    })
-}
-
-fn extract_arginfo_size_and_name(input: &str) -> Option<Vec<(&str, usize)>> {
+fn extract_headers_and_c_file(
+    header: &mut String,
+    c_file: &mut String,
+    contents: String,
+) -> Option<()> {
     let mut result = Vec::new();
 
     let mut name = "";
     let mut counter = 0;
 
-    for line in input.lines() {
-        let line = line.trim();
-        if line.starts_with("ZEND_BEGIN_") {
+    for line in contents.lines() {
+        let trimmed_line = line.trim();
+
+        if trimmed_line.starts_with("ZEND_FUNCTION")
+            || trimmed_line.starts_with("ZEND_METHOD")
+            || trimmed_line.starts_with("static const zend_function_entry ext_functions[]")
+            || trimmed_line.starts_with("static const zend_function_entry class_")
+            || trimmed_line.starts_with("ZEND_ME")
+            || trimmed_line.starts_with("ZEND_FE_END")
+            || trimmed_line.starts_with("ZEND_FE")
+            || trimmed_line.starts_with("ZEND_NS_")
+            || trimmed_line.starts_with("};")
+        {
+            continue;
+        }
+
+        if trimmed_line.contains("zend_class_entry *register_") {
+            header.push_str("extern ");
+            header.push_str(&trimmed_line["static ".len()..]);
+            header.push(';');
+            header.push('\n');
+        }
+
+        if trimmed_line.contains("_methods);") {
+            let last_comma = trimmed_line.rfind(',').unwrap();
+            c_file.push_str(&trimmed_line[..last_comma]);
+            c_file.push_str(", NULL);");
+        } else if trimmed_line.starts_with("static ") {
+            c_file.push_str(trimmed_line.strip_prefix("static ").unwrap());
+        } else {
+            c_file.push_str(trimmed_line);
+        }
+
+        c_file.push('\n');
+
+        if trimmed_line.starts_with("ZEND_BEGIN_") {
             let start = line.find("arginfo_")?;
             let end = line.find(',')?;
 
             name = &line[start..end];
         }
 
-        if line.starts_with("ZEND_ARG_") {
+        if trimmed_line.starts_with("ZEND_ARG_") {
             counter += 1;
         }
 
-        if line.starts_with("ZEND_END_ARG_INFO") {
+        if trimmed_line.starts_with("ZEND_END_ARG_INFO") {
             result.push((name, counter + 1));
             counter = 0;
             name = "";
         }
     }
 
-    Some(result)
+    if !result.is_empty() {
+        result.iter().for_each(|(name, count)| {
+            header.push_str("extern const zend_internal_arg_info ");
+            header.push_str(name);
+            header.push('[');
+            header.push_str(count.to_string().as_str());
+            header.push_str("];\n");
+        });
+    }
+
+    Some(())
 }
 
 #[cfg(test)]
@@ -232,59 +261,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_write_header() {
+    fn test_extract_content_and_header() {
         let mut header = String::new();
-        let content = vec![
-            ("arginfo_Complex_say_hello", 1),
-            ("arginfo_Complex_say_hello2", 5),
-        ];
+        let mut c_file = String::new();
 
-        write_header(&mut header, &content);
+        const INPUT: &str =
+            include_str!("../tests/test_extract_content_and_header/say_hello_arginfo.h");
+        const EXPECTED_HEADER: &str =
+            include_str!("../tests/test_extract_content_and_header/expected_header");
+        const EXPECTED_C_FILE: &str =
+            include_str!("../tests/test_extract_content_and_header/expected_c_file");
 
-        assert_eq!(
-            header,
-            r#"extern zend_internal_arg_info arginfo_Complex_say_hello[1];
-
-extern zend_internal_arg_info arginfo_Complex_say_hello2[5];
-
-"#
-        );
-    }
-
-    #[test]
-    fn test_extract_arginfo_size_and_name() {
-        let input = r#"
-        #pragma once
-
-        #include <php.h>
-
-        ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Complex_say_hello, 0, 1,
-                                                IS_STRING, 0)
-        ZEND_ARG_TYPE_INFO(0, name, IS_STRING, 0)
-        ZEND_END_ARG_INFO()
-
-
-        ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Complex_say_hello2, 0, 1,
-                                                IS_STRING, 0)
-        ZEND_ARG_TYPE_INFO(0, name, IS_STRING, 0)
-        ZEND_ARG_TYPE_INFO(0, name, IS_STRING, 0)
-        ZEND_ARG_TYPE_INFO(0, name, IS_STRING, 0)
-        ZEND_ARG_TYPE_INFO(0, name, IS_STRING, 0)
-        ZEND_END_ARG_INFO()
-        "#;
-
-        let result = extract_arginfo_size_and_name(input);
-
-        assert!(result.is_some());
-
-        let result = result.unwrap();
-
-        assert_eq!(result.len(), 2);
-
-        assert_eq!("arginfo_Complex_say_hello", result[0].0);
-        assert_eq!(2, result[0].1);
-
-        assert_eq!("arginfo_Complex_say_hello2", result[1].0);
-        assert_eq!(5, result[1].1)
+        assert!(extract_headers_and_c_file(&mut header, &mut c_file, INPUT.into()).is_some());
+        assert_eq!(EXPECTED_HEADER, header.as_str());
+        assert_eq!(EXPECTED_C_FILE, c_file.as_str());
     }
 }

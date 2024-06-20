@@ -11,5 +11,6 @@ fn main() {
     std::fs::copy(
         current_dir().unwrap().join("gen_stub.php"),
         out_path.join("gen_stub.php"),
-    ).unwrap();
+    )
+    .unwrap();
 }

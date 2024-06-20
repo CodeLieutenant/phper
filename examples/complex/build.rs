@@ -21,6 +21,5 @@ fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let stubs = current_dir.join("stubs");
 
-
     phper_build::generate_php_function_args(&out_path, &[&stubs], None).unwrap();
 }

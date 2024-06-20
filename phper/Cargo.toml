@@ -28,7 +28,7 @@ thiserror = "1.0.61"
 bitflags = "2.5.0"
 memoffset = "0.9.1"
 smallvec = { version = "1.13.2", features = ["const_generics", "const_new", "union"] }
-
+paste = "^1.0.15"
 
 phper-alloc = { workspace = true }
 phper-macros = { workspace = true }
