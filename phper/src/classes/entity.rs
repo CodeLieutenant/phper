@@ -1,17 +1,15 @@
-use smallvec::SmallVec;
 use std::{any::Any, marker::PhantomData, mem::zeroed, ptr::null_mut, rc::Rc};
+
+use smallvec::SmallVec;
 
 use phper_sys::{
     phper_init_class_entry, phper_register_class_entry, zend_class_entry, zend_class_implements,
     zend_function_entry,
 };
 
-use crate::{functions::FunctionEntry, objects::StateObj, types::Scalar, values::ZVal};
+use crate::{functions::FunctionEntry, objects::StateObj, values::ZVal};
 
-use super::{
-    create_object, entry::ClassEntry, PropertyEntity, StateCloner, StateConstructor,
-    StaticStateClass, Visibility,
-};
+use super::{create_object, entry::ClassEntry, StateCloner, StateConstructor, StaticStateClass};
 
 /// Builder for registering class.
 ///
@@ -19,9 +17,9 @@ use super::{
 /// third-party resources.*
 pub struct ClassEntity<T> {
     class: zend_class_entry,
-    state_constructor: Rc<StateConstructor<T>>,
+    state_constructor: Rc<StateConstructor>,
     method_entities: SmallVec<[FunctionEntry; 16]>,
-    property_entities: Vec<PropertyEntity>,
+    // property_entities: Vec<PropertyEntity>,
     parent: Option<Box<dyn Fn() -> &'static ClassEntry>>,
     interfaces: Vec<Box<dyn Fn() -> &'static ClassEntry>>,
     bind_class: Option<&'static StaticStateClass<()>>,
@@ -47,12 +45,12 @@ impl<T> ClassEntity<T> {
     }
 }
 
-pub trait Handler<T, Z, E> {
-    fn execute(&self, state: &mut StateObj<T>, args: &mut [ZVal]) -> Result<Z, E>;
+pub trait Handler<Z, E> {
+    fn execute(&self, state: &mut StateObj, args: &mut [ZVal]) -> Result<Z, E>;
 }
 
-impl<T, Z, E> Handler<T, Z, E> for dyn Fn(&mut StateObj<T>, &mut [ZVal]) -> Result<Z, E> + 'static {
-    fn execute(&self, state: &mut StateObj<T>, args: &mut [ZVal]) -> Result<Z, E> {
+impl<Z, E> Handler<Z, E> for dyn Fn(&mut StateObj, &mut [ZVal]) -> Result<Z, E> + 'static {
+    fn execute(&self, state: &mut StateObj, args: &mut [ZVal]) -> Result<Z, E> {
         self(state, args)
     }
 }
@@ -72,9 +70,9 @@ impl<T> ClassEntity<T> {
 
         Self {
             class: unsafe { phper_init_class_entry(class_name.as_ptr().cast(), class_name_len) },
-            state_constructor: Rc::new(state_constructor),
+            state_constructor: Rc::new(move || Box::new(state_constructor()) as Box<dyn Any>),
             method_entities: SmallVec::default(),
-            property_entities: Vec::new(),
+            // property_entities: Vec::new(),
             parent: None,
             interfaces: Vec::new(),
             state_cloner: None,
@@ -139,31 +137,31 @@ impl<T> ClassEntity<T> {
     /// The argument `value` should be `Copy` because 'zend_declare_property'
     /// receive only scalar zval , otherwise will report fatal error:
     /// "Internal zvals cannot be refcounted".
-    pub fn add_property(
-        &mut self,
-        name: impl Into<String>,
-        visibility: Visibility,
-        value: impl Into<Scalar>,
-    ) {
-        self.property_entities
-            .push(PropertyEntity::new(name, visibility, value));
-    }
+    // pub fn add_property(
+    //     &mut self,
+    //     name: impl Into<String>,
+    //     visibility: Visibility,
+    //     value: impl Into<Scalar>,
+    // ) {
+    //     self.property_entities
+    //         .push(PropertyEntity::new(name, visibility, value));
+    // }
 
     /// Declare static property.
     ///
     /// The argument `value` should be `Copy` because 'zend_declare_property'
     /// receive only scalar zval , otherwise will report fatal error:
     /// "Internal zvals cannot be refcounted".
-    pub fn add_static_property(
-        &mut self,
-        name: impl Into<String>,
-        visibility: Visibility,
-        value: impl Into<Scalar>,
-    ) {
-        let mut entity = PropertyEntity::new(name, visibility, value);
-        entity.set_vis_static();
-        self.property_entities.push(entity);
-    }
+    // pub fn add_static_property(
+    //     &mut self,
+    //     name: impl Into<String>,
+    //     visibility: Visibility,
+    //     value: impl Into<Scalar>,
+    // ) {
+    //     let mut entity = PropertyEntity::new(name, visibility, value);
+    //     entity.set_vis_static();
+    //     self.property_entities.push(entity);
+    // }
 
     /// Register class to `extends` the parent class.
     ///
@@ -307,9 +305,9 @@ impl<T> crate::modules::Registerer for ClassEntity<T> {
 
             (*class_ce).__bindgen_anon_2.create_object = Some(create_object);
 
-            for property in &self.property_entities {
-                property.declare(class_ce);
-            }
+            // for property in &self.property_entities {
+            //     property.declare(class_ce);
+            // }
         }
 
         Ok(())

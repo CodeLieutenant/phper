@@ -19,9 +19,8 @@ use std::{
     str,
 };
 
-use phper_sys::*;
 use crate::ini::Stage;
-
+use phper_sys::*;
 
 /// Configuration changeable policy.
 #[repr(u32)]
@@ -37,7 +36,6 @@ pub enum Policy {
     /// Entry can be set in `php.ini` or `httpd.conf`.
     System = PHP_INI_SYSTEM,
 }
-
 
 /// The Type which can transform to an ini value.
 pub trait IntoIniValue {

@@ -21,7 +21,6 @@ pub enum Stage {
     HtAccess = ZEND_INI_STAGE_HTACCESS as i32,
 }
 
-
 macro_rules! try_from_stage_int {
     ($arg:ty) => {
         impl TryFrom<$arg> for Stage {

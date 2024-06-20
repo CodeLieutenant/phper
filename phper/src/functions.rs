@@ -12,6 +12,7 @@
 //!
 //! TODO Add lambda.
 
+use crate::classes::MethodEntity;
 use crate::{
     classes::{entry::ClassEntry, RawVisibility, Visibility},
     errors::{throw, ArgumentCountError, ExceptionGuard, ThrowObject, Throwable},
@@ -30,7 +31,6 @@ use std::{
     ptr::{self, null_mut},
     rc::Rc,
 };
-use crate::classes::MethodEntity;
 
 pub(crate) trait Callable {
     fn call(&self, execute_data: &mut ExecuteData, arguments: &mut [ZVal], return_value: &mut ZVal);
@@ -118,7 +118,7 @@ impl FunctionEntry {
         )
     }
 
-    pub(crate) unsafe fn from_method_entity(entity:  MethodEntity) -> FunctionEntry {
+    pub(crate) unsafe fn from_method_entity(entity: MethodEntity) -> FunctionEntry {
         Self::entry(
             &entity.name,
             entity.arguments,
@@ -176,7 +176,6 @@ impl FunctionEntity {
         }
     }
 }
-
 
 /// Wrapper of [`zend_function`].
 #[repr(transparent)]

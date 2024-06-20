@@ -12,7 +12,6 @@ mod args_bindings;
 
 use std::convert::Infallible;
 use std::ffi::CStr;
-use std::mem::size_of;
 
 use args_bindings::{
     arginfo_Complex_get_all_ini, arginfo_Complex_say_hello, arginfo_Complex_throw_exception,

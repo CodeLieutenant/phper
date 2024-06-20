@@ -1,9 +1,8 @@
-mod stage;
 mod ini;
+mod stage;
 
-
-pub use stage::Stage;
 pub use ini::*;
+pub use stage::Stage;
 
 /// Get the global registered configuration value.
 ///
