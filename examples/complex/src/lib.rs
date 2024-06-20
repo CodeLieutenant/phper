@@ -12,17 +12,15 @@ mod args_bindings;
 
 use std::convert::Infallible;
 use std::ffi::CStr;
+use std::mem::size_of;
 
-use args_bindings::{arginfo_Complex_say_hello, arginfo_Complex_throw_exception, arginfo_Complex_get_all_ini};
+use args_bindings::{
+    arginfo_Complex_get_all_ini, arginfo_Complex_say_hello, arginfo_Complex_throw_exception,
+};
 
 use phper::arrays::ZArray;
 use phper::ini::{ini_get, Policy};
-use phper::{
-    modules::Module,
-    php_get_module,
-    values::ZVal,
-    zend_args,
-};
+use phper::{modules::Module, php_get_module, values::ZVal, zend_args};
 
 fn say_hello(arguments: &mut [ZVal]) -> phper::Result<String> {
     let name = &mut arguments[0];
@@ -59,23 +57,32 @@ pub fn get_module() -> Module {
     module.on_request_init(|_info| {});
     module.on_request_shutdown(|_info| {});
 
-    // register functions
-    module.add_function(
-        "Comples\\say_hello",
-        zend_args!(arginfo_Complex_say_hello),
-        say_hello,
-    )
-    .add_function("Complex\\throw_exception", zend_args!(arginfo_Complex_throw_exception), throw_exception)
-    .add_function("Comples\\get_all_ini", zend_args!(arginfo_Complex_get_all_ini), |_: &mut [ZVal]| {
-        let mut arr = ZArray::new();
+    module
+        .add_function(
+            "Comples\\say_hello",
+            zend_args!(arginfo_Complex_say_hello),
+            say_hello,
+        )
+        .add_function(
+            "Complex\\throw_exception",
+            zend_args!(arginfo_Complex_throw_exception),
+            throw_exception,
+        )
+        .add_function(
+            "Comples\\get_all_ini",
+            zend_args!(arginfo_Complex_get_all_ini),
+            |_: &mut [ZVal]| {
+                let mut arr = ZArray::new();
 
-        let complex_enable = ZVal::from(ini_get::<bool>("complex.enable"));
-        arr.insert("complex.enable", complex_enable);
+                let complex_enable = ZVal::from(ini_get::<bool>("complex.enable"));
+                arr.insert("complex.enable", complex_enable);
 
-        let complex_description = ZVal::from(ini_get::<Option<&CStr>>("complex.description"));
-        arr.insert("complex.description", complex_description);
-        Ok::<_, Infallible>(arr)
-    });
+                let complex_description =
+                    ZVal::from(ini_get::<Option<&CStr>>("complex.description"));
+                arr.insert("complex.description", complex_description);
+                Ok::<_, Infallible>(arr)
+            },
+        );
 
     //
     // // register classes

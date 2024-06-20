@@ -19,7 +19,7 @@ use super::{
 /// third-party resources.*
 pub struct ClassEntity<T> {
     class: zend_class_entry,
-    state_constructor: Rc<StateConstructor>,
+    state_constructor: Rc<StateConstructor<T>>,
     method_entities: SmallVec<[FunctionEntry; 16]>,
     property_entities: Vec<PropertyEntity>,
     parent: Option<Box<dyn Fn() -> &'static ClassEntry>>,
@@ -47,12 +47,12 @@ impl<T> ClassEntity<T> {
     }
 }
 
-pub trait Handler<Z, E> {
-    fn execute(&self, state: &mut StateObj, args: &mut [ZVal]) -> Result<Z, E>;
+pub trait Handler<T, Z, E> {
+    fn execute(&self, state: &mut StateObj<T>, args: &mut [ZVal]) -> Result<Z, E>;
 }
 
-impl<Z, E> Handler<Z, E> for dyn Fn(&mut StateObj, &mut [ZVal]) -> Result<Z, E> + 'static {
-    fn execute(&self, state: &mut StateObj, args: &mut [ZVal]) -> Result<Z, E> {
+impl<T, Z, E> Handler<T, Z, E> for dyn Fn(&mut StateObj<T>, &mut [ZVal]) -> Result<Z, E> + 'static {
+    fn execute(&self, state: &mut StateObj<T>, args: &mut [ZVal]) -> Result<Z, E> {
         self(state, args)
     }
 }
@@ -72,11 +72,7 @@ impl<T> ClassEntity<T> {
 
         Self {
             class: unsafe { phper_init_class_entry(class_name.as_ptr().cast(), class_name_len) },
-            state_constructor: Rc::new(move || {
-                let state = state_constructor();
-                let boxed = Box::new(state) as Box<dyn Any>;
-                Box::into_raw(boxed)
-            }),
+            state_constructor: Rc::new(state_constructor),
             method_entities: SmallVec::default(),
             property_entities: Vec::new(),
             parent: None,
@@ -278,11 +274,11 @@ impl<T> crate::modules::Registerer for ClassEntity<T> {
             methods.push(FunctionEntry::empty());
 
             {
-                let mut entry = zeroed::<zend_function_entry>();
-                let ptr = &mut entry as *mut _ as *mut *const StateConstructor;
-                let state_constructor = Rc::into_raw(self.state_constructor);
-                ptr.write(state_constructor);
-                methods.push(FunctionEntry(entry));
+                // let mut entry = zeroed::<zend_function_entry>();
+                // let ptr = &mut entry as *mut _ as *mut *const StateConstructor;
+                // let state_constructor = Rc::into_raw(self.state_constructor);
+                // ptr.write(state_constructor);
+                // methods.push(FunctionEntry(entry));
             }
 
             // Store the state constructor pointer to zend_class_entry.

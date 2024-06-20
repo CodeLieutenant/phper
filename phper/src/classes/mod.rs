@@ -104,7 +104,7 @@ impl<T> StaticStateClass<T> {
     ///
     /// If the `__construct` is private, or protected and the called scope isn't
     /// parent class, it will throw PHP Error.
-    pub fn new_object(&'static self, arguments: impl AsMut<[ZVal]>) -> crate::Result<StateObject> {
+    pub fn new_object(&'static self, arguments: impl AsMut<[ZVal]>) -> crate::Result<StateObject<T>> {
         self.as_class_entry()
             .new_object(arguments)
             .map(ZObject::into_raw)
@@ -114,7 +114,7 @@ impl<T> StaticStateClass<T> {
     /// Create the object from class, without calling `__construct`.
     ///
     /// **Be careful when `__construct` is necessary.**
-    pub fn init_object(&'static self) -> crate::Result<StateObject> {
+    pub fn init_object(&'static self) -> crate::Result<StateObject<T>> {
         self.as_class_entry()
             .init_object()
             .map(ZObject::into_raw)
@@ -168,7 +168,7 @@ impl StaticInterface {
     }
 }
 
-pub(crate) type StateConstructor = dyn Fn() -> *mut dyn Any;
+pub(crate) type StateConstructor<T> = dyn Fn() -> T;
 
 pub(crate) type StateCloner = dyn Fn(*const dyn Any) -> *mut dyn Any;
 
@@ -352,7 +352,7 @@ unsafe extern "C" fn create_object(ce: *mut zend_class_entry) -> *mut zend_objec
 
     // Get state constructor.
     func_ptr = func_ptr.offset(1);
-    let state_constructor = func_ptr as *mut *const StateConstructor;
+    let state_constructor = func_ptr as *mut *const StateConstructor<()>;
     let state_constructor = state_constructor.read().as_ref().unwrap();
 
     // Get state cloner.
@@ -413,9 +413,9 @@ unsafe fn clone_object_common(object: *mut zend_object) -> *mut zend_object {
     (*new_object).handlers = (*object).handlers;
 
     // Call the state cloner and store the state.
-    let state_object = StateObj::from_mut_object_ptr(object);
-    let data = (state_cloner)(*state_object.as_mut_any_state());
-    *new_state_object.as_mut_any_state() = data;
+    // let state_object = StateObj::from_mut_object_ptr(object);
+    // let data = (state_cloner)(*state_object.as_mut_any_state());
+    // *new_state_object.as_mut_any_state() = data;
 
     new_object
 }
@@ -424,7 +424,7 @@ unsafe extern "C" fn free_object(object: *mut zend_object) {
     let state_object = StateObj::from_mut_object_ptr(object);
 
     // Drop the state.
-    state_object.drop_state();
+    drop(state_object.any_state);
 
     // Original destroy call.
     zend_object_std_dtor(object);

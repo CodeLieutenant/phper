@@ -103,7 +103,7 @@ impl ZObj {
     ///
     /// Should only call this method for the class of object defined by the
     /// extension created by `phper`, otherwise, memory problems will caused.
-    pub unsafe fn as_state_obj(&self) -> &StateObj {
+    pub unsafe fn as_state_obj<T>(&self) -> &StateObj<T> {
         StateObj::from_object_ptr(self.as_ptr())
     }
 
@@ -112,8 +112,8 @@ impl ZObj {
     /// # Safety
     ///
     /// Should only call this method for the class of object defined by the
-    /// extension created by `phper`, otherwise, memory problems will caused.
-    pub unsafe fn as_mut_state_obj(&mut self) -> &mut StateObj {
+    /// extension created by `phper`, otherwise, memory problems will be caused.
+    pub unsafe fn as_mut_state_obj<T>(&mut self) -> &mut StateObj<T> {
         StateObj::from_mut_object_ptr(self.as_mut_ptr())
     }
 
@@ -251,8 +251,8 @@ impl ZObj {
         }
     }
 
-    pub(crate) unsafe fn gc_refcount(&self) -> u32 {
-        phper_zend_object_gc_refcount(self.as_ptr())
+    pub(crate) fn gc_refcount(&self) -> u32 {
+        unsafe { phper_zend_object_gc_refcount(self.as_ptr()) }
     }
 }
 
@@ -367,12 +367,12 @@ pub(crate) type AnyState = *mut dyn Any;
 
 /// The object owned state, usually as the parameter of method handler.
 #[repr(C)]
-pub struct StateObj {
-    any_state: AnyState,
+pub struct StateObj<T> {
+    pub(crate) any_state: T,
     object: ZObj,
 }
 
-impl StateObj {
+impl<T> StateObj<T> {
     /// The `zend_object_alloc` often allocate more memory to hold the state
     /// (usually is a pointer), and place it before `zend_object`.
     pub(crate) const fn offset() -> usize {
@@ -398,14 +398,14 @@ impl StateObj {
             .unwrap()
     }
 
-    pub(crate) unsafe fn drop_state(&mut self) {
-        drop(Box::from_raw(self.any_state));
-    }
-
-    #[inline]
-    pub(crate) fn as_mut_any_state(&mut self) -> &mut AnyState {
-        &mut self.any_state
-    }
+    // pub(crate) unsafe fn drop_state(&mut self) {
+    //     drop(Box::from_raw(self.any_state));
+    // }
+    //
+    // #[inline]
+    // pub(crate) fn as_mut_any_state(&mut self) -> &mut AnyState {
+    //     &mut self.any_state
+    // }
 
     /// Gets object.
     #[inline]
@@ -420,25 +420,21 @@ impl StateObj {
     }
 }
 
-impl StateObj {
+impl<T> StateObj<T> {
     /// Gets inner state.
-    pub fn as_state<T: 'static>(&self) -> &T {
-        unsafe {
-            let any_state = self.any_state.as_ref().unwrap();
-            any_state.downcast_ref().unwrap()
-        }
+    #[inline]
+    pub fn as_state(&self) -> &T {
+        &self.any_state
     }
 
     /// Gets inner mutable state.
-    pub fn as_mut_state<T: 'static>(&mut self) -> &mut T {
-        unsafe {
-            let any_state = self.any_state.as_mut().unwrap();
-            any_state.downcast_mut().unwrap()
-        }
+    #[inline]
+    pub fn as_mut_state(&mut self) -> &mut T {
+        &mut self.any_state
     }
 }
 
-impl Deref for StateObj {
+impl<T> Deref for StateObj<T> {
     type Target = ZObj;
 
     fn deref(&self) -> &Self::Target {
@@ -446,13 +442,13 @@ impl Deref for StateObj {
     }
 }
 
-impl DerefMut for StateObj {
+impl<T> DerefMut for StateObj<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.object
     }
 }
 
-impl Debug for StateObj {
+impl<T> Debug for StateObj<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         common_fmt(self, f, "StateObj")
     }
@@ -460,11 +456,11 @@ impl Debug for StateObj {
 
 /// The object owned state, usually crated by
 /// [StaticStateClass](crate::classes::StaticStateClass).
-pub struct StateObject {
-    inner: *mut StateObj,
+pub struct StateObject<T> {
+    inner: *mut StateObj<T>,
 }
 
-impl StateObject {
+impl<T> StateObject<T> {
     #[inline]
     pub(crate) fn from_raw_object(object: *mut zend_object) -> Self {
         unsafe {
@@ -485,26 +481,24 @@ impl StateObject {
     }
 }
 
-impl StateObject {
+impl<T: 'static> StateObject<T> {
     /// Converts into state.
     ///
     /// Because the [zend_object] is refcounted type,
     /// therefore, you can only obtain state ownership when the refcount of the
     /// [zend_object] is `1`, otherwise, it will return
     /// `None`.
-    pub fn into_state<T: 'static>(mut self) -> Option<T> {
-        unsafe {
-            if self.gc_refcount() != 1 {
-                return None;
-            }
-            let null: AnyState = Box::into_raw(Box::new(()));
-            let ptr = replace(self.as_mut_any_state(), null);
-            Some(*Box::from_raw(ptr).downcast().unwrap())
+    pub fn into_state(mut self) -> Option<T> {
+            if self.gc_refcount() == 1 {
+                let val = unsafe { std::mem::zeroed::<T>() };
+                Some(replace(&mut self.any_state, val))
+            } else {
+                None
         }
     }
 }
 
-impl Drop for StateObject {
+impl<T> Drop for StateObject<T> {
     fn drop(&mut self) {
         unsafe {
             drop(ZObject::from_raw(self.as_mut_ptr()));
@@ -512,21 +506,21 @@ impl Drop for StateObject {
     }
 }
 
-impl Deref for StateObject {
-    type Target = StateObj;
+impl<T> Deref for StateObject<T> {
+    type Target = StateObj<T>;
 
     fn deref(&self) -> &Self::Target {
         unsafe { self.inner.as_ref().unwrap() }
     }
 }
 
-impl DerefMut for StateObject {
+impl<T> DerefMut for StateObject<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.inner.as_mut().unwrap() }
     }
 }
 
-impl Debug for StateObject {
+impl<T> Debug for StateObject<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         common_fmt(self, f, "StateObject")
     }
