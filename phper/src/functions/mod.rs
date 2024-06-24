@@ -27,8 +27,7 @@ use crate::{
 
 use phper_alloc::ToRefOwned;
 
-use std::ffi::{c_char, CStr};
-use std::mem::ManuallyDrop;
+use std::ffi::{CStr};
 use std::{ffi::CString, marker::PhantomData, mem::zeroed, ptr::null_mut};
 
 pub(crate) trait Callable {

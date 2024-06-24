@@ -1,19 +1,21 @@
 
 use phper::zend_create_fn;
 
+
+#[allow(non_upper_case_globals)]
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
+#[allow(deref_nullptr)]
+#[allow(clippy::all)]
 mod bindings {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-    #![allow(deref_nullptr)]
-    #![allow(clippy::all)]
+
     include!(concat!(env!("OUT_DIR"), "/php_args_bindings.rs"));
 }
 
 use bindings::register_class_Complex_Foo;
 
 pub use bindings::{
-    arginfo_Complex_get_all_ini, arginfo_Complex_say_hello, arginfo_Complex_throw_exception,
+    arginfo_Complex_say_hello, arginfo_Complex_throw_exception,
     arginfo_class_Complex_Foo_getFoo, arginfo_class_Complex_Foo_setFoo,
 };
 

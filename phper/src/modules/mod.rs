@@ -33,8 +33,6 @@ use crate::{
     values::ZVal,
 };
 
-use crate::functions::Callable;
-use crate::modules::function_entry::PHP_FUNCTIONS;
 use extern_c::{module_info, module_shutdown, module_startup, request_shutdown, request_startup};
 
 /// Global pointer hold the Module builder.

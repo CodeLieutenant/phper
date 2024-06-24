@@ -32,7 +32,6 @@ use std::{
     mem::size_of,
     os::raw::c_int,
     ptr::null_mut,
-    slice,
     sync::atomic::{AtomicPtr, Ordering},
 };
 

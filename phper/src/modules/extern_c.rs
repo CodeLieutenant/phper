@@ -1,15 +1,13 @@
-use crate::functions::FunctionEntry;
 use crate::ini;
-use crate::modules::function_entry::FEntry;
 use crate::modules::{
-    get_module, Module, ModuleInfo, Registerer, GLOBAL_MODULE, GLOBAL_MODULE_ENTRY,
+    get_module, Module, ModuleInfo, Registerer,
     GLOBAL_MODULE_NUMBER,
 };
 use crate::zend_result::ZResult;
 use phper_macros::c_str_ptr;
 use phper_sys::{
     display_ini_entries, php_info_print_table_end, php_info_print_table_row,
-    php_info_print_table_start, zend_function_entry, zend_module_entry, zend_register_functions,
+    php_info_print_table_start, zend_module_entry,
 };
 use std::mem::take;
 use std::os::raw::c_int;

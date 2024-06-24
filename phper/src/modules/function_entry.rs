@@ -1,4 +1,3 @@
-use crate::functions::FunctionEntry;
 use phper_sys::zend_function_entry;
 use std::mem::ManuallyDrop;
 use std::ops::{Deref, DerefMut};

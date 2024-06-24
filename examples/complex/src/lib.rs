@@ -10,19 +10,15 @@
 
 mod args_bindings;
 
-use std::convert::Infallible;
-use std::ffi::CStr;
 
 use args_bindings::{
-    arginfo_Complex_get_all_ini, arginfo_Complex_say_hello, arginfo_Complex_throw_exception,
+    arginfo_Complex_say_hello, arginfo_Complex_throw_exception,
     arginfo_class_Complex_Foo_getFoo, arginfo_class_Complex_Foo_setFoo,
 };
 
 use crate::args_bindings::CLASS_COMPLEX_FOO;
-use phper::arrays::ZArray;
 use phper::classes::methods::MethodEntityBuilder;
 use phper::classes::ClassEntity;
-use phper::ini::{ini_get, Policy};
 use phper::objects::StateObj;
 use phper::{modules::Module, php_get_module, values::ZVal, zend_args};
 

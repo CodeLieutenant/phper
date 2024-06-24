@@ -28,7 +28,7 @@ pub(crate) fn zend_create_fn(input: TokenStream) -> TokenStream {
         const_name,
     } = parse_macro_input!(input as ZendFn);
 
-    let fn_name = format!("zend_create_fn_{}", original_zend_fn.to_string());
+    let fn_name = format!("zend_create_fn_{}", original_zend_fn);
     let new_fn_name = Ident::new(&fn_name, Span::call_site());
 
     let result = quote! {
