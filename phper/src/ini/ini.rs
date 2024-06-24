@@ -11,6 +11,7 @@
 //! Apis relate to [zend_ini_entry_def].
 
 use crate::{c_str, strings::ZString};
+use std::ffi::CString;
 use std::{
     ffi::{c_int, c_uchar, c_void, CStr},
     mem::zeroed,
@@ -272,16 +273,17 @@ type ZendOnModify = unsafe extern "C" fn(
 
 pub(crate) fn create_ini_entry_ex<T>(
     name: impl AsRef<str>,
-    default_value: impl AsRef<str>,
+    default_value: String,
     modifiable: u32,
     on_modify_impl: Option<T>,
 ) -> zend_ini_entry_def
 where
     T: OnModify,
 {
-    let name = name.as_ref();
-    let default_value = default_value.as_ref();
-    let (modifiable, name_length) = (modifiable as c_uchar, name.len() as u16);
+    let name_length = name.as_ref().len();
+    let name = CString::new(name.as_ref()).unwrap().into_raw();
+    let default_value_len = default_value.len();
+    let default_value = CString::new(default_value).unwrap_or_default().into_raw();
 
     let (callback, arg): (Option<ZendOnModify>, *mut OnModifyCarry<T>) = match on_modify_impl {
         Some(callback) => (
@@ -294,22 +296,21 @@ where
     };
 
     zend_ini_entry_def {
-        name: name.as_ptr().cast(),
-        name_length,
+        name,
+        name_length: name_length as u16,
         on_modify: callback,
         mh_arg1: arg as *mut c_void,
         mh_arg2: null_mut(),
         mh_arg3: null_mut(),
-        value: default_value.as_ptr().cast(),
-        value_length: default_value.len() as u32,
+        value: default_value,
+        value_length: default_value_len as u32,
         displayer: None,
-        modifiable,
+        modifiable: modifiable as c_uchar,
     }
 }
 
 unsafe fn entries(mut ini_entries: Vec<zend_ini_entry_def>) -> *const zend_ini_entry_def {
-    ini_entries.push(zeroed::<zend_ini_entry_def>());
-
+    ini_entries.push(zeroed());
     Box::into_raw(ini_entries.into_boxed_slice()).cast()
 }
 

@@ -184,7 +184,7 @@ impl<T> crate::modules::Registerer for ClassEntity<T> {
 
             let class_ce = phper_register_class_entry(
                 Some(self.class_create),
-                methods.as_ptr().cast(),
+                Box::into_raw(methods.into_boxed_slice()).cast(),
                 Some(create_object),
             );
 

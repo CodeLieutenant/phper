@@ -186,7 +186,7 @@ impl Module {
         policy: ini::Policy,
     ) -> &mut Self {
         let ini = ini::create_ini_entry_ex(
-            name.as_ref(),
+            name,
             default_value.into_ini_value(),
             policy as u32,
             Option::<()>::None,

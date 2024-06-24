@@ -15,26 +15,23 @@ ini_set("display_errors", "On");
 ini_set("display_startup_errors", "On");
 error_reporting(E_ALL);
 
-// print_r(get_defined_functions());
-// print_r(ini_get_all());
 assert_eq(Complex\say_hello("world"), "Hello, world!\n");
-//
-// try {
-//     Complex\throw_exception();
-// } catch (ErrorException $e) {
-//     assert_eq($e->getMessage(), "I am sorry");
-// }
-//
+
+try {
+    Complex\throw_exception();
+} catch (ErrorException $e) {
+    assert_eq($e->getMessage(), "I am sorry");
+}
+
 // assert_eq(Complex\get_all_ini(), [
 //     "complex.enable" => false,
 //     "complex.description" => "hello world.",
 // ]);
 
-// $foo = new Complex\\FooClass();
-// assert_eq($foo->getFoo(), 100);
-//
-// $foo->setFoo(200);
-// assert_eq($foo->getFoo(), 200);
+$foo = new Complex\Foo();
+assert_eq($foo->getFoo(), 100);
+$foo->setFoo(200);
+assert_eq($foo->getFoo(), 200);
 
 function assert_eq($left, $right) {
     if ($left !== $right) {
