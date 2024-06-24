@@ -155,14 +155,6 @@ impl ExecuteData {
         let val = Box::into_raw(data.into_boxed_slice());
 
         (val as *const zend_internal_arg_info, arguments.len() as u32)
-        // let handler_ptr = Box::into_raw(handler) as *const u8;
-        //
-        //
-        // let arg_info_ptr: *mut u8 = std::mem::transmute(&mut handler_info);
-        //
-        // std::ptr::copy_nonoverlapping(handler_ptr, arg_info_ptr, CALLABLE_SIZE);
-        //
-        // data.push(handler_info);
     }
 
     /// Gets arguments count.

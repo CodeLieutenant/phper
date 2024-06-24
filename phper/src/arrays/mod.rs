@@ -17,15 +17,9 @@ mod zarr;
 mod zarray;
 
 use std::{
-    borrow::Borrow,
-    convert::TryInto,
     fmt::{self, Debug},
-    ops::{Deref, DerefMut},
 };
 
-use derive_more::From;
-
-use crate::{alloc::ToRefOwned, sys::*};
 
 pub use iterators::{Iter, IterKey, IterMut};
 pub use keys::{InsertKey, Key};
