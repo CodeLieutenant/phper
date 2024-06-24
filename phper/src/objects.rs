@@ -480,7 +480,7 @@ impl StateObject {
     /// therefore, you can only obtain state ownership when the refcount of the
     /// [zend_object] is `1`, otherwise, it will return
     /// `None`.
-    pub fn into_state<T>(mut self) -> Option<T> {
+    pub fn into_state<T>(self) -> Option<T> {
         // if self.gc_refcount() == 1 {
         //     let val = unsafe { std::mem::zeroed::<T>() };
         //     Some(replace(&mut self.any_state, val))

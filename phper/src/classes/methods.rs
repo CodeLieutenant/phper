@@ -6,12 +6,11 @@ use phper_sys::{
     ZEND_ACC_PROTECTED, ZEND_ACC_PUBLIC,
 };
 use std::ffi::CString;
-use std::rc::Rc;
 
 /// Builder for registering class method.
 pub struct MethodEntity {
     pub(crate) name: CString,
-    pub(crate) handler: Option<Rc<dyn Callable>>,
+    pub(crate) handler: Option<Box<dyn Callable>>,
     pub(crate) arguments: &'static [zend_internal_arg_info],
     pub(crate) visibility: RawVisibility,
 }
@@ -19,7 +18,7 @@ pub struct MethodEntity {
 #[derive(Default)]
 pub struct MethodEntityBuilder {
     name: CString,
-    handler: Option<Rc<dyn Callable>>,
+    handler: Option<Box<dyn Callable>>,
     arguments: &'static [zend_internal_arg_info],
     visibility: RawVisibility,
 }
@@ -32,7 +31,7 @@ impl Into<FunctionEntry> for MethodEntity {
 
 impl MethodEntityBuilder {
     #[inline]
-    fn new(name: impl AsRef<str>, arguments: &'static [zend_internal_arg_info]) -> Self {
+    pub fn new(name: impl AsRef<str>, arguments: &'static [zend_internal_arg_info]) -> Self {
         Self {
             name: ensure_end_with_zero(name),
             handler: None,
@@ -42,8 +41,8 @@ impl MethodEntityBuilder {
     }
 
     #[inline]
-    pub fn set_handler(mut self, handler: impl Into<Rc<dyn Callable>>) -> Self {
-        self.handler = Some(handler.into());
+    pub(crate) fn set_handler(mut self, handler: impl Callable + 'static) -> Self {
+        self.handler = Some(Box::new(handler));
         self
     }
 
@@ -78,6 +77,8 @@ impl MethodEntityBuilder {
     }
 
     pub(crate) fn build(self) -> MethodEntity {
+        assert!(self.handler.is_some());
+
         MethodEntity {
             name: self.name,
             handler: self.handler,

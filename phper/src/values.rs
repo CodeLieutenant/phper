@@ -1,4 +1,5 @@
 // Copyright (c) 2022 PHPER Framework Team
+#![allow(clippy::ptr_offset_with_cast)]
 // PHPER is licensed under Mulan PSL v2.
 // You can use this software according to the terms and conditions of the Mulan
 // PSL v2. You may obtain a copy of Mulan PSL v2 at:
@@ -10,6 +11,7 @@
 
 //! Apis relate to [zval].
 
+use crate::functions::Callable;
 use crate::{
     alloc::EBox,
     arrays::{ZArr, ZArray},
@@ -24,20 +26,18 @@ use crate::{
 };
 use phper_alloc::RefClone;
 use std::{
-    convert::TryInto,
-    ffi::CStr,
-    fmt,
-    fmt::Debug,
-    marker::PhantomData,
-    mem::{transmute, zeroed, ManuallyDrop, MaybeUninit},
-    str,
+    convert::TryInto, ffi::CStr, fmt, fmt::Debug, marker::PhantomData, mem::MaybeUninit, str,
 };
+
+#[repr(C)]
+union ToZendInternalArg {
+    pub(crate) callable: *const dyn Callable,
+    pub(crate) internal_arg_info: zend_internal_arg_info,
+}
 
 /// Wrapper of [zend_execute_data].
 #[repr(transparent)]
-pub struct ExecuteData {
-    inner: zend_execute_data,
-}
+pub struct ExecuteData(zend_execute_data);
 
 impl ExecuteData {
     /// Wraps a raw pointer.
@@ -93,49 +93,94 @@ impl ExecuteData {
 
     /// Returns a raw pointer wrapped.
     pub const fn as_ptr(&self) -> *const zend_execute_data {
-        &self.inner
+        &self.0
     }
 
     /// Returns a raw pointer wrapped.
     #[inline]
     #[allow(dead_code)]
     pub fn as_mut_ptr(&mut self) -> *mut zend_execute_data {
-        &mut self.inner
+        &mut self.0
     }
 
     /// Gets common arguments count.
     #[inline]
     pub fn common_num_args(&self) -> u32 {
-        unsafe { (*self.inner.func).common.num_args }
+        unsafe { (*self.0.func).common.num_args }
     }
 
     /// Gets common required arguments count.
     #[inline]
     pub fn common_required_num_args(&self) -> usize {
-        unsafe { (*self.inner.func).common.required_num_args as usize }
+        unsafe { (*self.0.func).common.required_num_args as usize }
     }
 
     /// Gets first common argument info.
     #[inline]
     pub fn common_arg_info(&self) -> *mut zend_arg_info {
-        unsafe { (*self.inner.func).common.arg_info }
+        unsafe { (*self.0.func).common.arg_info }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn get_handler(&self) -> &'static dyn Callable {
+        let len = self.common_num_args() as usize;
+        let arg_info = (*self.0.func)
+            .internal_function
+            .arg_info
+            .offset((len - 1) as isize)
+            .cast_const();
+
+        let items = std::slice::from_raw_parts(arg_info, 1);
+
+        let val = ToZendInternalArg {
+            internal_arg_info: items[0],
+        };
+
+        val.callable.as_ref().unwrap_unchecked()
+    }
+
+    pub(crate) unsafe fn write_handler(
+        handler: Box<dyn Callable>,
+        arguments: &'static [zend_internal_arg_info],
+    ) -> (*const zend_internal_arg_info, u32) {
+        let callable = Box::into_raw(handler);
+
+        let val = ToZendInternalArg { callable };
+
+        let mut data = Vec::with_capacity(arguments.len());
+        data.extend_from_slice(arguments);
+        data.push(val.internal_arg_info);
+        data.shrink_to_fit();
+
+        let val = Box::into_raw(data.into_boxed_slice());
+
+        (val as *const zend_internal_arg_info, arguments.len() as u32)
+        // let handler_ptr = Box::into_raw(handler) as *const u8;
+        //
+        //
+        // let arg_info_ptr: *mut u8 = std::mem::transmute(&mut handler_info);
+        //
+        // std::ptr::copy_nonoverlapping(handler_ptr, arg_info_ptr, CALLABLE_SIZE);
+        //
+        // data.push(handler_info);
     }
 
     /// Gets arguments count.
     #[inline]
     pub fn num_args(&self) -> usize {
-        unsafe { phper_zend_num_args(self.as_ptr()).try_into().unwrap() }
+        unsafe { self.0.This.u2.num_args as usize }
     }
 
     /// Gets associated function.
     pub fn func(&self) -> &ZFunc {
-        unsafe { ZFunc::from_mut_ptr(self.inner.func) }
+        unsafe { ZFunc::from_mut_ptr(self.0.func) }
     }
 
     /// Gets associated `$this` object if exists.
+    #[inline]
     pub fn get_this(&self) -> Option<&ZObj> {
         unsafe {
-            let val = ZVal::from_ptr(phper_get_this(&self.inner));
+            let val = ZVal::from_ptr(&self.0.This);
             val.as_z_obj()
         }
     }
@@ -143,21 +188,23 @@ impl ExecuteData {
     /// Gets associated mutable `$this` object if exists.
     pub fn get_this_mut(&mut self) -> Option<&mut ZObj> {
         unsafe {
-            let val = ZVal::from_mut_ptr(phper_get_this_mut(&mut self.inner));
+            let val = ZVal::from_mut_ptr(&mut self.0.This);
             val.as_mut_z_obj()
         }
     }
 
-    pub(crate) unsafe fn get_parameters_array(&mut self) -> Vec<ManuallyDrop<ZVal>> {
-        let num_args = self.num_args();
-        let mut arguments = vec![zeroed::<zval>(); num_args];
-        if num_args > 0 {
-            phper_zend_get_parameters_array_ex(
-                num_args.try_into().unwrap(),
-                arguments.as_mut_ptr(),
-            );
+    #[inline]
+    pub(crate) unsafe fn get_parameters_array(&mut self) -> Option<ZArray> {
+        let args_count = self.num_args();
+        let mut arr = ZVal::from(ZArray::with_capacity(args_count));
+
+        if zend_copy_parameters_array(args_count as u32, arr.as_mut_ptr())
+            == ZEND_RESULT_CODE_FAILURE
+        {
+            None
+        } else {
+            Some(ZArray::from_zval(arr))
         }
-        transmute(arguments)
     }
 
     /// Gets parameter by index.
@@ -556,8 +603,6 @@ impl ZVal {
     }
 
     /// Internally convert to long.
-    ///
-    /// TODO To fix assertion failed.
     pub fn convert_to_long(&mut self) {
         unsafe {
             phper_convert_to_long(self.as_mut_ptr());
@@ -565,8 +610,6 @@ impl ZVal {
     }
 
     /// Internally convert to string.
-    ///
-    /// TODO To fix assertion failed.
     pub fn convert_to_string(&mut self) {
         unsafe {
             phper_convert_to_string(self.as_mut_ptr());

@@ -31,6 +31,7 @@ pub mod strings;
 pub mod types;
 mod utils;
 pub mod values;
+mod zend_result;
 
 pub use crate::errors::{ok, Error, Result};
 pub use phper_alloc as alloc;

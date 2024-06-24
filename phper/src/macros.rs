@@ -27,7 +27,7 @@ macro_rules! echo {
 /// # Examples
 ///
 /// ```no_test
-/// phper::errro!("Hello, {}!", message)
+/// phper::error!("Hello, {}!", message)
 /// ```
 #[macro_export]
 macro_rules! error {
@@ -144,19 +144,4 @@ macro_rules! zend_args {
             std::mem::transmute::<_, &'static [phper::sys::zend_internal_arg_info]>(val)
         };
     };
-}
-#[macro_export]
-macro_rules! zend_create_fn {
-    ($x:ident) => {{
-        paste::paste! {
-            unsafe extern "C" fn [<zend_create_fn_ $x:lower>]() -> *mut phper::sys::zend_class_entry
-            {
-                unsafe { $x() as *mut phper::sys::zend_class_entry }
-            }
-        }
-
-        paste::paste! {
-            [<zend_create_fn_ $x:lower>]
-        }
-    }};
 }

@@ -15,13 +15,11 @@ pub mod entity;
 pub mod entry;
 pub mod interfaces;
 pub mod methods;
-pub mod properties;
 pub mod zend_classes;
 
 pub use entity::*;
 pub use interfaces::*;
 pub use methods::MethodEntity;
-pub use properties::*;
 pub use zend_classes::*;
 
 use crate::{
@@ -173,10 +171,10 @@ unsafe extern "C" fn create_object(ce: *mut zend_class_entry) -> *mut zend_objec
     let state_constructor = state_constructor.read().as_ref().unwrap();
 
     // Get state cloner.
-    func_ptr = func_ptr.offset(1);
-    let has_state_cloner =
-        slice::from_raw_parts(func_ptr as *const u8, size_of::<*const StateCloner>())
-            != [0u8; size_of::<*const StateCloner>()];
+    // func_ptr = func_ptr.offset(1);
+    // let has_state_cloner =
+    //     slice::from_raw_parts(func_ptr as *const u8, size_of::<*const StateCloner>())
+    //         != [0u8; size_of::<*const StateCloner>()];
 
     // Common initialize process.
     let object = state_object.as_mut_object().as_mut_ptr();
@@ -188,7 +186,7 @@ unsafe extern "C" fn create_object(ce: *mut zend_class_entry) -> *mut zend_objec
     let mut handlers = Box::new(std_object_handlers);
     handlers.offset = StateObj::offset() as c_int;
     handlers.free_obj = Some(free_object);
-    handlers.clone_obj = has_state_cloner.then_some(clone_object);
+    // handlers.clone_obj = has_state_cloner.then_some(clone_object);
     (*object).handlers = Box::into_raw(handlers);
 
     // Call the state constructor and store the state.

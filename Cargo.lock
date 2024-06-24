@@ -1142,6 +1142,7 @@ dependencies = [
 name = "phper-macros"
 version = "0.13.0"
 dependencies = [
+ "phper-sys",
  "proc-macro2",
  "quote",
  "syn",

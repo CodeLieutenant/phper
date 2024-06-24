@@ -58,8 +58,8 @@ impl<T> EBox<T> {
     /// Consumes and returning a wrapped raw pointer.
     ///
     /// Will leak memory.
-    pub fn into_raw(b: EBox<T>) -> *mut T {
-        ManuallyDrop::new(b).ptr
+    pub fn into_raw(self) -> *mut T {
+        ManuallyDrop::new(self).ptr
     }
 
     /// Consumes the `EBox`, returning the wrapped value.

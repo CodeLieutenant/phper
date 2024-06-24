@@ -12,25 +12,24 @@
 //!
 //! TODO Add lambda.
 
+mod invoke;
+
 use crate::classes::MethodEntity;
 use crate::{
-    classes::{entry::ClassEntry, RawVisibility, Visibility},
-    errors::{throw, ArgumentCountError, ExceptionGuard, ThrowObject, Throwable},
+    classes::{entry::ClassEntry, RawVisibility},
+    errors::{throw, ExceptionGuard, ThrowObject, Throwable},
     objects::{StateObj, ZObj, ZObject},
     strings::{ZStr, ZString},
     sys::*,
     utils::ensure_end_with_zero,
     values::{ExecuteData, ZVal},
 };
+
 use phper_alloc::ToRefOwned;
-use std::mem::zeroed;
-use std::{
-    ffi::{CStr, CString},
-    marker::PhantomData,
-    mem::transmute,
-    ptr::{self, null_mut},
-    rc::Rc,
-};
+
+use std::ffi::{c_char, CStr};
+use std::mem::ManuallyDrop;
+use std::{ffi::CString, marker::PhantomData, mem::zeroed, ptr::null_mut};
 
 pub(crate) trait Callable {
     fn call(&self, execute_data: &mut ExecuteData, arguments: &mut [ZVal], return_value: &mut ZVal);
@@ -101,7 +100,7 @@ where
 }
 
 /// Wrapper of [`zend_function_entry`].
-#[repr(C)]
+#[repr(transparent)]
 pub struct FunctionEntry(pub(crate) zend_function_entry);
 
 impl FunctionEntry {
@@ -110,55 +109,58 @@ impl FunctionEntry {
     }
 
     pub(crate) unsafe fn from_function_entity(entity: FunctionEntity) -> FunctionEntry {
-        Self::entry(
-            &entity.name,
-            entity.arguments,
-            Some(entity.handler.clone()),
-            None,
-        )
+        Self::entry(entity.name, entity.arguments, entity.handler, None)
     }
 
     pub(crate) unsafe fn from_method_entity(entity: MethodEntity) -> FunctionEntry {
         Self::entry(
-            &entity.name,
+            entity.name,
             entity.arguments,
-            entity.handler.clone(),
+            entity.handler.expect("Handler must be set on Method"),
             Some(entity.visibility),
         )
     }
 
     unsafe fn entry(
-        name: &CStr,
+        name: CString,
         arguments: &'static [zend_internal_arg_info],
-        handler: Option<Rc<dyn Callable>>,
+        handler: Box<dyn Callable>,
         visibility: Option<RawVisibility>,
     ) -> FunctionEntry {
-        let raw_handler = handler.as_ref().map(|_| invoke as _);
-
-        if let Some(handler) = handler {
-            let translator = CallableTranslator {
-                callable: Rc::into_raw(handler),
-            };
-            let last_arg_info: zend_internal_arg_info = translator.internal_arg_info;
-            // infos.push(last_arg_info);
-        }
-
-        let flags = visibility.unwrap_or(Visibility::default() as u32);
+        let (args, count) = ExecuteData::write_handler(handler, arguments);
 
         FunctionEntry(zend_function_entry {
-            fname: name.as_ptr().cast(),
-            handler: raw_handler,
-            arg_info: null_mut(),
-            num_args: 0u32,
-            flags,
+            fname: name.into_raw(),
+            handler: Some(invoke::call_function_handler),
+            arg_info: args,
+            num_args: count,
+            flags: visibility.unwrap_or(ZEND_ACC_PUBLIC),
         })
+    }
+}
+
+impl Drop for FunctionEntry {
+    fn drop(&mut self) {
+        let name = unsafe { CStr::from_ptr(self.0.fname) }.to_str().unwrap();
+        println!("Called drop for FunctionEntry {}", name);
+
+        unsafe {
+            //
+            // drop(Vec::from_raw_parts(
+            //     self.0.arg_info.offset(-1) as *mut zend_internal_arg_info,
+            //     self.0.num_args as usize,
+            //     self.0.num_args as usize,
+            // ));
+            //
+            // drop(CString::from_raw(self.0.fname as *mut c_char))
+        }
     }
 }
 
 /// Builder for registering php function.
 pub struct FunctionEntity {
     name: CString,
-    handler: Rc<dyn Callable>,
+    handler: Box<dyn Callable>,
     arguments: &'static [zend_internal_arg_info],
 }
 
@@ -166,7 +168,7 @@ impl FunctionEntity {
     #[inline]
     pub(crate) fn new(
         name: impl AsRef<str>,
-        handler: Rc<dyn Callable>,
+        handler: Box<dyn Callable>,
         arguments: &'static [zend_internal_arg_info],
     ) -> Self {
         FunctionEntity {
@@ -179,9 +181,7 @@ impl FunctionEntity {
 
 /// Wrapper of [`zend_function`].
 #[repr(transparent)]
-pub struct ZFunc {
-    inner: zend_function,
-}
+pub struct ZFunc(zend_function);
 
 impl ZFunc {
     /// Wraps a raw pointer.
@@ -200,13 +200,13 @@ impl ZFunc {
 
     /// Returns a raw pointer wrapped.
     pub const fn as_ptr(&self) -> *const zend_function {
-        &self.inner
+        &self.0
     }
 
     /// Returns a raw pointer wrapped.
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut zend_function {
-        &mut self.inner
+        &mut self.0
     }
 
     /// Get the function name if exists.
@@ -228,16 +228,15 @@ impl ZFunc {
     /// Get the function related class if exists.
     pub fn get_class(&self) -> Option<&ClassEntry> {
         unsafe {
-            let ptr = self.inner.common.scope;
+            let ptr = self.0.common.scope;
             if ptr.is_null() {
                 None
             } else {
-                Some(ClassEntry::from_ptr(self.inner.common.scope))
+                Some(ClassEntry::from_ptr(self.0.common.scope))
             }
         }
     }
 
-    #[allow(clippy::useless_conversion)]
     pub(crate) fn call(
         &mut self,
         mut object: Option<&mut ZObj>,
@@ -268,50 +267,6 @@ impl ZFunc {
             );
         })
     }
-}
-
-/// Just for type transmutation.
-pub(crate) union CallableTranslator {
-    pub(crate) callable: *const dyn Callable,
-    pub(crate) internal_arg_info: zend_internal_arg_info,
-    pub(crate) arg_info: zend_arg_info,
-}
-
-/// The entry for all registered PHP functions.
-unsafe extern "C" fn invoke(execute_data: *mut zend_execute_data, return_value: *mut zval) {
-    let execute_data = ExecuteData::from_mut_ptr(execute_data);
-    let return_value = ZVal::from_mut_ptr(return_value);
-
-    let num_args = execute_data.common_num_args();
-    let arg_info = execute_data.common_arg_info();
-
-    let last_arg_info = arg_info.offset((num_args + 1) as isize);
-    let translator = CallableTranslator {
-        arg_info: *last_arg_info,
-    };
-    let handler = translator.callable;
-    let handler = handler.as_ref().expect("handler is null");
-
-    // Check arguments count.
-    let num_args = execute_data.num_args();
-    let required_num_args = execute_data.common_required_num_args();
-    if num_args < required_num_args {
-        let func_name = execute_data.func().get_function_or_method_name();
-        let err: crate::Error = match func_name.to_str() {
-            Ok(func_name) => {
-                ArgumentCountError::new(func_name.to_owned(), required_num_args, num_args).into()
-            }
-            Err(e) => e.into(),
-        };
-        throw(err);
-        *return_value = ().into();
-        return;
-    }
-
-    let mut arguments = execute_data.get_parameters_array();
-    let arguments = arguments.as_mut_slice();
-
-    handler.call(execute_data, transmute(arguments), return_value);
 }
 
 /// Call user function by name.
@@ -374,12 +329,12 @@ pub(crate) fn call_raw_common(call_fn: impl FnOnce(&mut ZVal)) -> crate::Result<
 
     unsafe {
         if !eg!(exception).is_null() {
-            let e = ptr::replace(&mut eg!(exception), null_mut());
+            let e = std::ptr::replace(&mut eg!(exception), null_mut());
             let obj = ZObject::from_raw(e);
-            match ThrowObject::new(obj) {
-                Ok(e) => return Err(e.into()),
-                Err(e) => return Err(e.into()),
-            }
+            return match ThrowObject::new(obj) {
+                Ok(e) => Err(e.into()),
+                Err(e) => Err(e.into()),
+            };
         }
     }
 

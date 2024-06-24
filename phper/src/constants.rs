@@ -20,7 +20,6 @@ pub struct Constant {
     flags: i32,
 }
 
-// #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Flags(u32);
 
@@ -45,7 +44,7 @@ impl Constant {
         let name = name.as_ref();
         let length = name.len();
         let ptr = name.as_bytes().as_ptr() as *const i8;
-        let flags = flags.unwrap_or(Flags::Cs | Flags::Persistent).bits() as i32;
+        let flags = flags.unwrap_or_default().bits() as i32;
         Self {
             constant: unsafe { phper_create_constant(ptr, length, value.into().inner, flags) },
             flags,

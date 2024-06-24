@@ -10,26 +10,32 @@
 
 //! Apis relate to [zend_module_entry].
 
-use crate::constants;
+mod extern_c;
+mod function_entry;
+
+use smallvec::SmallVec;
+use std::mem::ManuallyDrop;
+use std::{
+    collections::HashMap,
+    ffi::CString,
+    mem::{size_of, zeroed},
+    os::raw::{c_uchar, c_uint, c_ushort},
+    ptr::{null, null_mut},
+};
+
 use crate::{
-    c_str_ptr,
     classes::{entity::ClassEntity, InterfaceEntity},
-    constants::Constant,
+    constants::{Constant, Flags},
     errors::Throwable,
     functions::{Function, FunctionEntity, FunctionEntry},
     ini,
     sys::*,
     values::ZVal,
 };
-use smallvec::SmallVec;
-use std::{
-    collections::HashMap,
-    ffi::CString,
-    mem::{size_of, take, zeroed},
-    os::raw::{c_int, c_uchar, c_uint, c_ushort},
-    ptr::{null, null_mut},
-    rc::Rc,
-};
+
+use crate::functions::Callable;
+use crate::modules::function_entry::PHP_FUNCTIONS;
+use extern_c::{module_info, module_shutdown, module_startup, request_shutdown, request_startup};
 
 /// Global pointer hold the Module builder.
 /// Because PHP is single threaded, so there is no lock here.
@@ -41,15 +47,6 @@ static mut GLOBAL_MODULE_ENTRY: *mut zend_module_entry = null_mut();
 unsafe fn get_module() -> &'static mut Module {
     unsafe { GLOBAL_MODULE.as_mut().unwrap_unchecked() }
 }
-
-/// Safety: This is used as a global variable, initialization is always
-/// guaranteed by PHP to be from one thread in ZTS, and on NTS its always one thread
-struct FEntry(SmallVec<[FunctionEntry; 64]>);
-
-unsafe impl Send for FEntry {}
-unsafe impl Sync for FEntry {}
-
-static mut PHP_FUNCTIONS: FEntry = FEntry(SmallVec::new_const());
 
 /// PHP Module information
 pub struct ModuleInfo {
@@ -64,99 +61,7 @@ pub(crate) trait Registerer {
     fn register(self, module_number: i32) -> Result<(), Box<dyn std::error::Error>>;
 }
 
-unsafe extern "C" fn module_startup(_type: c_int, module_number: c_int) -> c_int {
-    let module: &mut Module = get_module();
-    GLOBAL_MODULE_NUMBER = module_number;
-
-    ini::register(take(&mut module.ini_entities), module_number);
-
-    for entity in take(&mut module.entities).into_iter() {
-        if let Err(err) = entity.register(module_number) {
-            crate::output::log(
-                crate::output::LogLevel::Error,
-                format!("Failed to register: {err:?}"),
-            );
-            return ZEND_RESULT_CODE_FAILURE;
-        }
-    }
-
-    if let Some(f) = take(&mut module.module_init) {
-        f(ModuleInfo {
-            ty: _type,
-            number: module_number,
-        });
-    }
-
-    ZEND_RESULT_CODE_SUCCESS
-}
-
-unsafe extern "C" fn module_shutdown(_type: c_int, module_number: c_int) -> c_int {
-    {
-        let module = get_module();
-
-        ini::unregister(module_number);
-
-        if let Some(f) = take(&mut module.module_shutdown) {
-            f(ModuleInfo {
-                ty: _type,
-                number: module_number,
-            });
-        }
-
-        if let Some(ref mut f) = take(&mut module.request_init) {
-            let _b = Box::from_raw(f);
-        }
-
-        if let Some(ref mut f) = take(&mut module.request_shutdown) {
-            let _b = Box::from_raw(f);
-        }
-    }
-
-    ZEND_RESULT_CODE_SUCCESS
-}
-
-unsafe extern "C" fn request_startup(_type: c_int, module_number: c_int) -> c_int {
-    let f = get_module().request_init.unwrap_unchecked();
-
-    f(ModuleInfo {
-        ty: _type,
-        number: module_number,
-    });
-
-    ZEND_RESULT_CODE_SUCCESS
-}
-
-unsafe extern "C" fn request_shutdown(_type: c_int, module_number: c_int) -> c_int {
-    let f = get_module().request_shutdown.unwrap_unchecked();
-
-    f(ModuleInfo {
-        ty: _type,
-        number: module_number,
-    });
-
-    ZEND_RESULT_CODE_SUCCESS
-}
-
-unsafe extern "C" fn module_info(zend_module: *mut zend_module_entry) {
-    let module = get_module();
-
-    php_info_print_table_start();
-    if !module.version.as_bytes().is_empty() {
-        php_info_print_table_row(2, c_str_ptr!("version"), module.version.as_ptr());
-    }
-    if !module.author.as_bytes().is_empty() {
-        php_info_print_table_row(2, c_str_ptr!("authors"), module.author.as_ptr());
-    }
-    for (key, value) in &module.infos {
-        php_info_print_table_row(2, key.as_ptr(), value.as_ptr());
-    }
-    php_info_print_table_end();
-
-    display_ini_entries(zend_module);
-}
-
 /// Builder for registering PHP Module.
-#[allow(clippy::type_complexity)]
 #[derive(Default)]
 pub struct Module {
     name: CString,
@@ -169,6 +74,7 @@ pub struct Module {
     entities: Vec<Entities>,
     ini_entities: Vec<zend_ini_entry_def>,
     infos: HashMap<CString, CString>,
+    functions: SmallVec<[zend_function_entry; 64]>,
 }
 
 pub(crate) enum Entities {
@@ -232,12 +138,12 @@ impl Module {
         Z: Into<ZVal> + 'static,
         E: Throwable + 'static,
     {
-        let entry = FunctionEntity::new(name, Rc::new(Function::new(handler)), arguments);
+        let handler = Box::new(Function::new(handler));
+        let entry = FunctionEntity::new(name, handler, arguments);
 
         unsafe {
-            PHP_FUNCTIONS
-                .0
-                .push(FunctionEntry::from_function_entity(entry));
+            let val = ManuallyDrop::new(FunctionEntry::from_function_entity(entry));
+            self.functions.push(val.0);
         }
 
         self
@@ -264,7 +170,7 @@ impl Module {
         &mut self,
         name: impl AsRef<str>,
         value: impl Into<ZVal>,
-        flags: Option<constants::Flags>,
+        flags: Option<Flags>,
     ) -> &mut Self {
         self.entities
             .push(Entities::Constant(Constant::new(name, value, flags)));
@@ -304,10 +210,14 @@ impl Module {
     }
 
     #[doc(hidden)]
-    pub unsafe fn module_entry(self) -> *const zend_module_entry {
+    pub unsafe fn module_entry(mut self) -> *const zend_module_entry {
         if !GLOBAL_MODULE_ENTRY.is_null() {
             return GLOBAL_MODULE_ENTRY;
         }
+
+        self.functions.push(zeroed::<zend_function_entry>());
+        self.functions.shrink_to_fit();
+        let fns = ManuallyDrop::new(std::mem::take(&mut self.functions).into_boxed_slice());
 
         let module = Box::leak(Box::new(self));
 
@@ -319,7 +229,7 @@ impl Module {
             ini_entry: null(),
             deps: null(),
             name: module.name.as_ptr(),
-            functions: module.function_entries(),
+            functions: fns.as_ptr(),
             module_startup_func: Some(module_startup),
             module_shutdown_func: Some(module_shutdown),
             request_startup_func: if module.request_init.is_some() {
@@ -353,15 +263,5 @@ impl Module {
         GLOBAL_MODULE_ENTRY = Box::into_raw(entry);
 
         GLOBAL_MODULE_ENTRY
-    }
-
-    unsafe fn function_entries(&self) -> *const zend_function_entry {
-        if PHP_FUNCTIONS.0.is_empty() {
-            return null();
-        }
-
-        PHP_FUNCTIONS.0.push(zeroed::<FunctionEntry>());
-
-        PHP_FUNCTIONS.0.as_ptr() as *const zend_function_entry
     }
 }
