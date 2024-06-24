@@ -11,7 +11,6 @@
 //! Apis relate to [zend_module_entry].
 
 mod extern_c;
-mod function_entry;
 
 use smallvec::SmallVec;
 use std::mem::ManuallyDrop;

@@ -109,7 +109,13 @@ impl ZStr {
         self.inner.val.as_ptr()
     }
 
+    /// Get String from Zend String
+    /// 
+    /// # Safety
+    ///     Only valid UTF8 Strings should be transformed
+    ///     Caller is responsible for checking string
     #[inline]
+    #[allow(dead_code)]
     pub unsafe fn as_str(&self) -> &str {
         let val: &[u8] = from_raw_parts(self.inner.val.as_ptr() as *const u8, self.inner.len);
         std::str::from_utf8_unchecked(val)

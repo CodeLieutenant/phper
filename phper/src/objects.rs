@@ -251,6 +251,8 @@ impl ZObj {
         }
     }
 
+    #[allow(dead_code)]
+    #[inline]
     pub(crate) fn gc_refcount(&self) -> u32 {
         unsafe { phper_zend_object_gc_refcount(self.as_ptr()) }
     }

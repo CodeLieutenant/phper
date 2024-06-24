@@ -148,7 +148,7 @@ unsafe impl<T> Sync for StaticStateClass<T> {}
 
 pub(crate) type StateConstructor = dyn Fn() -> Box<dyn Any>;
 
-pub(crate) type StateCloner = dyn Fn(*const dyn Any) -> *mut dyn Any;
+// pub(crate) type StateCloner = dyn Fn(*const dyn Any) -> *mut dyn Any;
 
 /// Raw visibility flag.
 pub(crate) type RawVisibility = u32;
@@ -194,10 +194,10 @@ unsafe extern "C" fn create_object(ce: *mut zend_class_entry) -> *mut zend_objec
     object
 }
 
-unsafe extern "C" fn clone_object(object: *mut zend_object) -> *mut zend_object {
-    // clone_object_common(object)
-    object
-}
+// unsafe extern "C" fn clone_object(object: *mut zend_object) -> *mut zend_object {
+//     // clone_object_common(object)
+//     object
+// }
 
 // unsafe fn clone_object_common(object: *mut zend_object) -> *mut zend_object {
 //     let ce = (*object).ce;

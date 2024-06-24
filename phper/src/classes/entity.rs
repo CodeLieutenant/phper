@@ -139,7 +139,7 @@ impl<T> ClassEntity<T> {
     ///     class
     /// }
     /// ```
-    pub fn state_cloner(&mut self, clone_fn: impl Fn(&T) -> T + 'static)
+    pub fn state_cloner(&mut self, _clone_fn: impl Fn(&T) -> T + 'static)
     where
         T: 'static,
     {

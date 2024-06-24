@@ -143,7 +143,7 @@ impl Drop for FunctionEntry {
         let name = unsafe { CStr::from_ptr(self.0.fname) }.to_str().unwrap();
         println!("Called drop for FunctionEntry {}", name);
 
-        unsafe {
+        // unsafe {
             //
             // drop(Vec::from_raw_parts(
             //     self.0.arg_info.offset(-1) as *mut zend_internal_arg_info,
@@ -152,7 +152,7 @@ impl Drop for FunctionEntry {
             // ));
             //
             // drop(CString::from_raw(self.0.fname as *mut c_char))
-        }
+        // }
     }
 }
 
