@@ -1,4 +1,4 @@
-use phper_sys::{ZEND_RESULT_CODE_FAILURE, ZEND_RESULT_CODE_SUCCESS};
+use crate::sys::{ZEND_RESULT_CODE_FAILURE, ZEND_RESULT_CODE_SUCCESS};
 use std::ffi::c_int;
 
 #[repr(i32)]

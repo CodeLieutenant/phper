@@ -10,10 +10,9 @@
 
 mod args_bindings;
 
-
 use args_bindings::{
-    arginfo_Complex_say_hello, arginfo_Complex_throw_exception,
-    arginfo_class_Complex_Foo_getFoo, arginfo_class_Complex_Foo_setFoo,
+    arginfo_Complex_say_hello, arginfo_Complex_throw_exception, arginfo_class_Complex_Foo_getFoo,
+    arginfo_class_Complex_Foo_setFoo,
 };
 
 use crate::args_bindings::CLASS_COMPLEX_FOO;
@@ -55,16 +54,17 @@ pub fn get_module() -> Module {
     module.on_request_init(|_info| {});
     module.on_request_shutdown(|_info| {});
 
-    module.add_function(
-        "Complex\\say_hello",
-        zend_args!(arginfo_Complex_say_hello),
-        say_hello,
-    )
-    .add_function(
-        "Complex\\throw_exception",
-        zend_args!(arginfo_Complex_throw_exception),
-        throw_exception,
-    );
+    module
+        .add_function(
+            "Complex\\say_hello",
+            zend_args!(arginfo_Complex_say_hello),
+            say_hello,
+        )
+        .add_function(
+            "Complex\\throw_exception",
+            zend_args!(arginfo_Complex_throw_exception),
+            throw_exception,
+        );
     // .add_function(
     //     "Complex\\get_all_ini",
     //     zend_args!(arginfo_Complex_get_all_ini),
@@ -82,7 +82,7 @@ pub fn get_module() -> Module {
     // );
     //
     let mut foo_class = ClassEntity::new(CLASS_COMPLEX_FOO);
-    
+
     foo_class.add_method(
         |this: &mut StateObj, _: &mut [ZVal]| {
             Ok::<_, phper::Error>(this.get_property("foo").clone())
@@ -90,7 +90,7 @@ pub fn get_module() -> Module {
         MethodEntityBuilder::new("getFoo", zend_args!(arginfo_class_Complex_Foo_getFoo))
             .set_public(),
     );
-    
+
     foo_class.add_method(
         |this: &mut StateObj, arguments: &mut [ZVal]| -> phper::Result<()> {
             this.set_property("foo", arguments[0].clone());

@@ -1,8 +1,5 @@
 use crate::ini;
-use crate::modules::{
-    get_module, Module, ModuleInfo, Registerer,
-    GLOBAL_MODULE_NUMBER,
-};
+use crate::modules::{get_module, Module, ModuleInfo, Registerer, GLOBAL_MODULE_NUMBER};
 use crate::zend_result::ZResult;
 use phper_macros::c_str_ptr;
 use phper_sys::{

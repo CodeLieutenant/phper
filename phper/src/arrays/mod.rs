@@ -16,10 +16,7 @@ mod keys;
 mod zarr;
 mod zarray;
 
-use std::{
-    fmt::{self, Debug},
-};
-
+use std::fmt::{self, Debug};
 
 pub use iterators::{Iter, IterKey, IterMut};
 pub use keys::{InsertKey, Key};

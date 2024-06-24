@@ -110,7 +110,7 @@ impl ZStr {
     }
 
     /// Get String from Zend String
-    /// 
+    ///
     /// # Safety
     ///     Only valid UTF8 Strings should be transformed
     ///     Caller is responsible for checking string
