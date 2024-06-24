@@ -1,5 +1,4 @@
-use std::ffi::c_char;
-use std::{any::Any, marker::PhantomData, mem::zeroed, rc::Rc};
+use std::{any::Any, marker::PhantomData};
 
 use smallvec::SmallVec;
 
@@ -17,7 +16,7 @@ use super::{create_object, StateConstructor, StaticStateClass};
 /// *It is a common practice for PHP extensions to use PHP objects to package
 /// third-party resources.*
 pub struct ClassEntity<T> {
-    state_constructor: Rc<StateConstructor>,
+    state_constructor: Box<StateConstructor>,
     method_entities: SmallVec<[FunctionEntry; 16]>,
     bind_class: Option<&'static StaticStateClass<()>>,
     class_create: unsafe extern "C" fn() -> *mut zend_class_entry,
@@ -66,7 +65,7 @@ impl<T> ClassEntity<T> {
         T: 'static,
     {
         Self {
-            state_constructor: Rc::new(move || Box::new(state_constructor()) as Box<dyn Any>),
+            state_constructor: Box::new(move || Box::new(state_constructor()) as Box<dyn Any>),
             method_entities: SmallVec::default(),
             class_create,
             // state_cloner: None,
@@ -157,6 +156,11 @@ impl<T> ClassEntity<T> {
     }
 }
 
+pub(super) union ToFunctionEntry {
+    pub(super) handler: *const StateConstructor,
+    pub(super) zend_function: zend_function_entry,
+}
+
 impl<T> crate::modules::Registerer for ClassEntity<T> {
     fn register(mut self, _: i32) -> Result<(), Box<dyn std::error::Error>> {
         unsafe {
@@ -164,12 +168,11 @@ impl<T> crate::modules::Registerer for ClassEntity<T> {
             methods.push(FunctionEntry::empty());
 
             {
-                let mut entry = zeroed::<zend_function_entry>();
+                let val = ToFunctionEntry {
+                    handler: Box::into_raw(self.state_constructor),
+                };
 
-                let ptr = std::ptr::from_mut(&mut entry.fname);
-                let state_constructor = Rc::into_raw(self.state_constructor) as *const c_char;
-                ptr.write(state_constructor);
-                methods.push(FunctionEntry(entry));
+                methods.insert(0, FunctionEntry(val.zend_function));
             }
 
             // Store the state constructor pointer to zend_class_entry.
@@ -182,9 +185,12 @@ impl<T> crate::modules::Registerer for ClassEntity<T> {
             //     methods.push(FunctionEntry(entry));
             // }
 
+            let methods: *const zend_function_entry =
+                Box::into_raw(methods.into_boxed_slice()).cast();
+
             let class_ce = phper_register_class_entry(
                 Some(self.class_create),
-                Box::into_raw(methods.into_boxed_slice()).cast(),
+                methods.offset(1),
                 Some(create_object),
             );
 

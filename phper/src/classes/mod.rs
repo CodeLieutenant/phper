@@ -154,20 +154,15 @@ pub(crate) type StateConstructor = dyn Fn() -> Box<dyn Any>;
 pub(crate) type RawVisibility = u32;
 
 unsafe extern "C" fn create_object(ce: *mut zend_class_entry) -> *mut zend_object {
-    // Alloc more memory size to store state data.
     let state_object = phper_zend_object_alloc(size_of::<StateObj>(), ce);
     let state_object = StateObj::from_mut_ptr(state_object);
 
-    // Find the hack elements hidden behind null builtin_function.
-    let mut func_ptr = (*ce).info.internal.builtin_functions;
-    while !(*func_ptr).fname.is_null() {
-        func_ptr = func_ptr.offset(1);
-    }
+    let func_ptr = (*ce).info.internal.builtin_functions.offset(-1);
+    let state_constructor = ToFunctionEntry {
+        zend_function: *func_ptr,
+    };
 
-    // Get state constructor.
-    func_ptr = func_ptr.offset(1);
-    let state_constructor = func_ptr as *mut *const StateConstructor;
-    let state_constructor = state_constructor.read().as_ref().unwrap();
+    let state_constructor = state_constructor.handler.as_ref().unwrap_unchecked();
 
     // Get state cloner.
     // func_ptr = func_ptr.offset(1);
@@ -175,20 +170,14 @@ unsafe extern "C" fn create_object(ce: *mut zend_class_entry) -> *mut zend_objec
     //     slice::from_raw_parts(func_ptr as *const u8, size_of::<*const StateCloner>())
     //         != [0u8; size_of::<*const StateCloner>()];
 
-    // Common initialize process.
     let object = state_object.as_mut_object().as_mut_ptr();
     zend_object_std_init(object, ce);
     object_properties_init(object, ce);
-    rebuild_object_properties(object);
 
-    // Set handlers
     let mut handlers = Box::new(std_object_handlers);
     handlers.offset = StateObj::offset() as c_int;
     handlers.free_obj = Some(free_object);
-    // handlers.clone_obj = has_state_cloner.then_some(clone_object);
     (*object).handlers = Box::into_raw(handlers);
-
-    // Call the state constructor and store the state.
     state_object.state = Some(state_constructor());
 
     object
