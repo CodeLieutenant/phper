@@ -79,11 +79,11 @@ jobs:
 
       - name: Cargo build
         run: |
-          cargo build --release --no-deps --all -- --allow dead_code
+          cargo build --release
 
       - name: Cargo clippy
         run: |
-          cargo clippy --release
+          cargo clippy --release --no-deps --all -- --allow dead_code
 
       - name: Cargo test
         run: |
