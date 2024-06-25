@@ -27,7 +27,6 @@ use crate::{
 
 use phper_alloc::ToRefOwned;
 
-use std::ffi::CStr;
 use std::{ffi::CString, marker::PhantomData, mem::zeroed, ptr::null_mut};
 
 pub(crate) trait Callable {
@@ -140,9 +139,8 @@ impl FunctionEntry {
 
 impl Drop for FunctionEntry {
     fn drop(&mut self) {
-        let name = unsafe { CStr::from_ptr(self.0.fname) }.to_str().unwrap();
-        println!("Called drop for FunctionEntry {}", name);
-
+        // let name = unsafe { CStr::from_ptr(self.0.fname) }.to_str().unwrap();
+        // println!("Called drop for FunctionEntry {}", name);
         // unsafe {
         //
         // drop(Vec::from_raw_parts(

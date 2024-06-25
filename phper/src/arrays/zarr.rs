@@ -114,7 +114,7 @@ impl ZArr {
                     phper_zend_str_update(
                         self.as_mut_ptr(),
                         s.as_ptr().cast(),
-                        s.len().try_into().unwrap(),
+                        s.len(),
                         val,
                     );
                 }
@@ -122,7 +122,7 @@ impl ZArr {
                     phper_zend_str_update(
                         self.as_mut_ptr(),
                         b.as_ptr().cast(),
-                        b.len().try_into().unwrap(),
+                        b.len(),
                         val,
                     );
                 }
@@ -130,7 +130,7 @@ impl ZArr {
                     phper_zend_str_update(
                         self.as_mut_ptr(),
                         s.as_c_str_ptr().cast(),
-                        s.len().try_into().unwrap(),
+                        s.len(),
                         val,
                     );
                 }
@@ -157,13 +157,13 @@ impl ZArr {
             let value = match key {
                 Key::Index(i) => phper_zend_hash_index_find(ptr, i),
                 Key::Str(s) => {
-                    phper_zend_str_find(ptr, s.as_ptr().cast(), s.len().try_into().unwrap())
+                    phper_zend_str_find(ptr, s.as_ptr().cast(), s.len())
                 }
                 Key::Bytes(b) => {
-                    phper_zend_str_find(ptr, b.as_ptr().cast(), b.len().try_into().unwrap())
+                    phper_zend_str_find(ptr, b.as_ptr().cast(), b.len())
                 }
                 Key::ZStr(s) => {
-                    phper_zend_str_find(ptr, s.as_c_str_ptr(), s.len().try_into().unwrap())
+                    phper_zend_str_find(ptr, s.as_c_str_ptr(), s.len())
                 }
             };
             if value.is_null() {
@@ -182,15 +182,15 @@ impl ZArr {
             match key {
                 Key::Index(i) => phper_zend_hash_index_exists(ptr, i),
                 Key::Str(s) => {
-                    phper_zend_str_exists(ptr, s.as_ptr().cast(), s.len().try_into().unwrap())
+                    phper_zend_str_exists(ptr, s.as_ptr().cast(), s.len())
                 }
                 Key::Bytes(b) => {
-                    phper_zend_str_exists(ptr, b.as_ptr().cast(), b.len().try_into().unwrap())
+                    phper_zend_str_exists(ptr, b.as_ptr().cast(), b.len())
                 }
                 Key::ZStr(s) => phper_zend_str_exists(
                     ptr,
                     s.to_bytes().as_ptr().cast(),
-                    s.len().try_into().unwrap(),
+                    s.len(),
                 ),
             }
         }
@@ -205,17 +205,17 @@ impl ZArr {
                 Key::Str(s) => phper_zend_str_del(
                     &mut self.inner,
                     s.as_ptr().cast(),
-                    s.len().try_into().unwrap(),
+                    s.len(),
                 ),
                 Key::Bytes(b) => phper_zend_str_del(
                     &mut self.inner,
                     b.as_ptr().cast(),
-                    b.len().try_into().unwrap(),
+                    b.len(),
                 ),
                 Key::ZStr(s) => phper_zend_str_del(
                     &mut self.inner,
                     s.as_c_str_ptr().cast(),
-                    s.len().try_into().unwrap(),
+                    s.len(),
                 ),
             }
         }
@@ -264,6 +264,7 @@ impl ZArr {
     /// # Safety:
     ///     Called must be sure that array is PACKED
     #[inline]
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn as_slice(&self) -> &[ZVal] {
         std::slice::from_raw_parts(
             self.inner.__bindgen_anon_1.arPacked as *const ZVal,
@@ -276,6 +277,7 @@ impl ZArr {
     /// # Safety:
     ///     Called must be sure that array is PACKED
     #[inline]
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn as_mut_slice(&mut self) -> &mut [ZVal] {
         std::slice::from_raw_parts_mut(
             self.inner.__bindgen_anon_1.arPacked as *mut ZVal,

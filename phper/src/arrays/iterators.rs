@@ -105,7 +105,7 @@ impl<'a> Iterator for RawIter<'a> {
                 self.arr,
                 &mut str_index,
                 &mut num_index,
-                &mut self.pos,
+                &self.pos,
             ) as u32;
 
             let iter_key = if result == HASH_KEY_IS_STRING {

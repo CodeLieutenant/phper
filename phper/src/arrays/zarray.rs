@@ -55,10 +55,22 @@ impl ZArray {
         ZArray::from_raw(phper_z_arr_p(value.as_ptr()) as *mut zend_array)
     }
 
+    /// Gets Rust slice from PHP Packed Array
+    ///
+    /// # Safety:
+    ///     Called must be sure that array is PACKED
+    #[inline]
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn as_slice(&self) -> &[ZVal] {
         unsafe { &*self.0 }.as_slice()
     }
 
+    /// Gets Mutable Rust slice from PHP Packed Array
+    ///
+    /// # Safety:
+    ///     Called must be sure that array is PACKED
+    #[inline]
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn as_mut_slice(&mut self) -> &mut [ZVal] {
         unsafe { &mut *self.0 }.as_mut_slice()
     }
