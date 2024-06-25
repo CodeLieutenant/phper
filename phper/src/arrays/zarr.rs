@@ -111,28 +111,13 @@ impl ZArr {
                     phper_zend_hash_index_update(self.as_mut_ptr(), i, val);
                 }
                 InsertKey::Str(s) => {
-                    phper_zend_str_update(
-                        self.as_mut_ptr(),
-                        s.as_ptr().cast(),
-                        s.len(),
-                        val,
-                    );
+                    phper_zend_str_update(self.as_mut_ptr(), s.as_ptr().cast(), s.len(), val);
                 }
                 InsertKey::Bytes(b) => {
-                    phper_zend_str_update(
-                        self.as_mut_ptr(),
-                        b.as_ptr().cast(),
-                        b.len(),
-                        val,
-                    );
+                    phper_zend_str_update(self.as_mut_ptr(), b.as_ptr().cast(), b.len(), val);
                 }
                 InsertKey::ZStr(s) => {
-                    phper_zend_str_update(
-                        self.as_mut_ptr(),
-                        s.as_c_str_ptr().cast(),
-                        s.len(),
-                        val,
-                    );
+                    phper_zend_str_update(self.as_mut_ptr(), s.as_c_str_ptr().cast(), s.len(), val);
                 }
             }
         }
@@ -156,15 +141,9 @@ impl ZArr {
         unsafe {
             let value = match key {
                 Key::Index(i) => phper_zend_hash_index_find(ptr, i),
-                Key::Str(s) => {
-                    phper_zend_str_find(ptr, s.as_ptr().cast(), s.len())
-                }
-                Key::Bytes(b) => {
-                    phper_zend_str_find(ptr, b.as_ptr().cast(), b.len())
-                }
-                Key::ZStr(s) => {
-                    phper_zend_str_find(ptr, s.as_c_str_ptr(), s.len())
-                }
+                Key::Str(s) => phper_zend_str_find(ptr, s.as_ptr().cast(), s.len()),
+                Key::Bytes(b) => phper_zend_str_find(ptr, b.as_ptr().cast(), b.len()),
+                Key::ZStr(s) => phper_zend_str_find(ptr, s.as_c_str_ptr(), s.len()),
             };
             if value.is_null() {
                 None
@@ -181,17 +160,9 @@ impl ZArr {
         unsafe {
             match key {
                 Key::Index(i) => phper_zend_hash_index_exists(ptr, i),
-                Key::Str(s) => {
-                    phper_zend_str_exists(ptr, s.as_ptr().cast(), s.len())
-                }
-                Key::Bytes(b) => {
-                    phper_zend_str_exists(ptr, b.as_ptr().cast(), b.len())
-                }
-                Key::ZStr(s) => phper_zend_str_exists(
-                    ptr,
-                    s.to_bytes().as_ptr().cast(),
-                    s.len(),
-                ),
+                Key::Str(s) => phper_zend_str_exists(ptr, s.as_ptr().cast(), s.len()),
+                Key::Bytes(b) => phper_zend_str_exists(ptr, b.as_ptr().cast(), b.len()),
+                Key::ZStr(s) => phper_zend_str_exists(ptr, s.to_bytes().as_ptr().cast(), s.len()),
             }
         }
     }
@@ -202,21 +173,11 @@ impl ZArr {
         unsafe {
             match key {
                 Key::Index(i) => phper_zend_hash_index_del(&mut self.inner, i),
-                Key::Str(s) => phper_zend_str_del(
-                    &mut self.inner,
-                    s.as_ptr().cast(),
-                    s.len(),
-                ),
-                Key::Bytes(b) => phper_zend_str_del(
-                    &mut self.inner,
-                    b.as_ptr().cast(),
-                    b.len(),
-                ),
-                Key::ZStr(s) => phper_zend_str_del(
-                    &mut self.inner,
-                    s.as_c_str_ptr().cast(),
-                    s.len(),
-                ),
+                Key::Str(s) => phper_zend_str_del(&mut self.inner, s.as_ptr().cast(), s.len()),
+                Key::Bytes(b) => phper_zend_str_del(&mut self.inner, b.as_ptr().cast(), b.len()),
+                Key::ZStr(s) => {
+                    phper_zend_str_del(&mut self.inner, s.as_c_str_ptr().cast(), s.len())
+                }
             }
         }
     }
