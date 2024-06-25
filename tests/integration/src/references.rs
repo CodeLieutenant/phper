@@ -8,7 +8,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use phper::{functions::Argument, modules::Module};
+use phper::{arguments::Argument, modules::Module};
 
 #[allow(clippy::disallowed_names)]
 pub fn integrate(module: &mut Module) {

@@ -64,5 +64,6 @@ EOF
     Cargo.toml:Cargo.toml \
     build.rs:build.rs \
     src:src \
+    stubs:stubs \
     ])
 fi

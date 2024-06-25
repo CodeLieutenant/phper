@@ -19,7 +19,7 @@ use hyper::body;
 use phper::{
     alloc::ToRefOwned,
     classes::{entity::ClassEntity, Visibility},
-    functions::Argument,
+    arguments::Argument,
     values::ZVal,
 };
 use std::{cell::RefCell, collections::HashMap, net::SocketAddr};

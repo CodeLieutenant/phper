@@ -9,5 +9,5 @@
 # See the Mulan PSL v2 for more details.
 
 [toolchain]
-channel = "1.75"
+channel = "1.78"
 components = ["clippy", "rustfmt"]

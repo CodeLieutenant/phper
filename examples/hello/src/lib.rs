@@ -8,7 +8,18 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use phper::{echo, functions::Argument, modules::Module, php_get_module, values::ZVal};
+mod args {
+    #![allow(non_upper_case_globals)]
+    #![allow(non_camel_case_types)]
+    #![allow(non_snake_case)]
+    #![allow(deref_nullptr)]
+    #![allow(clippy::all)]
+    include!(concat!(env!("OUT_DIR"), "/php_args_bindings.rs"));
+}
+
+use args::arginfo_say_hello;
+use phper::zend_args;
+use phper::{echo, modules::Module, php_get_module, values::ZVal};
 
 /// The php function, receive arguments with type `ZVal`.
 fn say_hello(arguments: &mut [ZVal]) -> phper::Result<()> {
@@ -34,9 +45,7 @@ pub fn get_module() -> Module {
     );
 
     // Register function `say_hello`, with one argument `name`.
-    module
-        .add_function("say_hello", say_hello)
-        .argument(Argument::by_val("name"));
+    module.add_function("say_hello", zend_args!(arginfo_say_hello), say_hello);
 
     module
 }

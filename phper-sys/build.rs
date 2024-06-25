@@ -12,10 +12,18 @@ use bindgen::Builder;
 use std::{env, ffi::OsStr, fmt::Debug, path::PathBuf, process::Command};
 
 fn main() {
+    let current_dir = env::current_dir().unwrap();
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+
     println!("cargo:rerun-if-env-changed=PHP_CONFIG");
     println!("cargo:rerun-if-changed=build.rs");
-    let current_dir = std::env::current_dir().unwrap();
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    println!("cargo:rustc-link-search={}", out_path.to_str().unwrap());
+    println!("cargo:rustc-link-lib=static=phpwrapper");
+    #[cfg(target_os = "macos")]
+    {
+        println!("cargo:rustc-link-arg=-undefined");
+        println!("cargo:rustc-link-arg=dynamic_lookup");
+    }
 
     let c_files = std::fs::read_dir(current_dir.join("c"))
         .unwrap()
@@ -23,11 +31,14 @@ fn main() {
         .map(|file| file.path().to_string_lossy().to_string())
         .collect::<Vec<_>>();
 
+    println!(
+        "cargo:rerun-if-changed={}",
+        current_dir.join("include").join("phper.h").display()
+    );
+
     c_files
         .iter()
         .for_each(|file| println!("cargo:rerun-if-changed={}", file));
-    println!("cargo:rustc-link-search={}", out_path.to_str().unwrap());
-    println!("cargo:rustc-link-lib=static=phpwrapper");
 
     let php_config = env::var("PHP_CONFIG").unwrap_or_else(|_| "php-config".to_string());
 
@@ -58,7 +69,6 @@ fn main() {
     let mut builder = Builder::default()
         .header("include/phper.h")
         .allowlist_file("include/phper.h")
-        // .allowlist_recursively(true)
         // Block the `zend_ini_parse_quantity` because it's document causes the doc test to fail.
         .blocklist_function("zend_ini_parse_quantity")
         .derive_hash(true)
@@ -80,7 +90,6 @@ fn main() {
 
     let bindings = builder.generate().expect("Unable to generate bindings");
 
-    // print!("cargo:warning={}", bindings.to_string());
     bindings
         .write_to_file(out_path.join("php_bindings.rs"))
         .expect("Unable to write output file");

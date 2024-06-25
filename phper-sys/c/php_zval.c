@@ -1,9 +1,5 @@
 #include <phper.h>
 
-// ==================================================
-// zval apis:
-// ==================================================
-
 const zend_long *phper_z_lval_p(const zval *zv) {
     return &(Z_LVAL_P(zv));
 }

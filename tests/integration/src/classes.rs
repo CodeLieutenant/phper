@@ -16,7 +16,7 @@ use phper::{
         zend_classes::{array_access_interface, iterator_interface},
         InterfaceEntity, StaticInterface, StaticStateClass, Visibility,
     },
-    functions::Argument,
+    arguments::Argument,
     modules::Module,
     values::ZVal,
 };

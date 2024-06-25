@@ -11,7 +11,7 @@
 use phper::{
     alloc::{RefClone, ToRefOwned},
     classes::{entity::ClassEntity, entry::ClassEntry, Visibility},
-    functions::Argument,
+    arguments::Argument,
     modules::Module,
     objects::ZObject,
     types::TypeInfo,

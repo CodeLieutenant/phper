@@ -88,7 +88,7 @@ Adding static class methods is more like adding module functions, because there 
 
 ```rust,no_run
 use phper::classes::{ClassEntity, ClassEntry, Visibility};
-use phper::functions::Argument;
+use phper::arguments::Argument;
 use phper::values::ZVal;
 
 let mut foo = ClassEntity::new("Foo");
@@ -117,7 +117,7 @@ to insert key value pair.
 ```rust,no_run
 use std::collections::HashMap;
 use phper::classes::{ClassEntity, ClassEntry, Visibility};
-use phper::functions::Argument;
+use phper::arguments::Argument;
 
 let mut class =
 ClassEntity::<HashMap<String, String>>::new_with_state_constructor(

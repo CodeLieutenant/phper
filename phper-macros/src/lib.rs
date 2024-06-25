@@ -8,19 +8,14 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-#![warn(rust_2018_idioms, missing_docs)]
+#![warn(rust_2021_compatibility, rust_2018_idioms)]
+#![allow(missing_docs)]
 #![warn(clippy::dbg_macro, clippy::print_stdout)]
 #![doc = include_str!("../README.md")]
 
-// TODO Write a bridge macro for easy usage about register functions and
-// classes, like `cxx`.
-
-mod alloc;
-mod derives;
-mod globals;
 mod inner;
-mod log;
 mod utils;
+mod zend_create_fn;
 
 use proc_macro::TokenStream;
 
@@ -50,6 +45,11 @@ pub fn c_str(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn c_str_ptr(input: TokenStream) -> TokenStream {
     utils::c_str_ptr(input)
+}
+
+#[proc_macro]
+pub fn zend_create_fn(input: TokenStream) -> TokenStream {
+    zend_create_fn::zend_create_fn(input)
 }
 
 /// PHP module entry, wrap the `phper::modules::Module` write operation.

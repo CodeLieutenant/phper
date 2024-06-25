@@ -27,5 +27,7 @@ quote = "1.0.31"
 syn = { version = "2.0.26", features = ["full"] }
 proc-macro2 = "1.0.66"
 
+phper-sys = { workspace = true }
+
 [dev-dependencies]
 syn = { version = "2.0.26", features = ["full", "extra-traits"] }

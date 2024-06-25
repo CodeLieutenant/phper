@@ -15,6 +15,5 @@
 #![allow(non_snake_case)]
 #![allow(deref_nullptr)]
 #![allow(clippy::all)]
-#![doc = include_str!("../README.md")]
 
 include!(concat!(env!("OUT_DIR"), "/php_bindings.rs"));

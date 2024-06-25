@@ -1,10 +1,10 @@
 # Register functions
 
-In `PHPER`, you can use [`add_function`](phper::modules::Module::add_function) to 
+In `PHPER`, you can use [`add_function`](phper::modules::Module::add_function) to
 register functions.
 
 ```rust,no_run
-use phper::{modules::Module, php_get_module, functions::Argument, echo};
+use phper::{modules::Module, php_get_module, arguments::Argument, echo};
 
 #[php_get_module]
 pub fn get_module() -> Module {
@@ -24,7 +24,7 @@ pub fn get_module() -> Module {
 }
 ```
 
-This example registers a function called `say_hello` and accepts a parameter 
+This example registers a function called `say_hello` and accepts a parameter
 `name` passed by value, similarly in PHP:
 
 ```php
@@ -51,13 +51,13 @@ Extension [ <persistent> extension #56 hello version <no_version> ] {
 }
 ```
 
-It is useful to register the parameters of the function, which can limit the 
+It is useful to register the parameters of the function, which can limit the
 number of parameters of the function.
 
 Especially when the parameters need to be passed by reference.
 
 ```rust,no_run
-use phper::{modules::Module, php_get_module, functions::Argument};
+use phper::{modules::Module, php_get_module, arguments::Argument};
 
 #[php_get_module]
 pub fn get_module() -> Module {
@@ -78,5 +78,5 @@ pub fn get_module() -> Module {
 ```
 
 Here, the argument is registered as
-[`Argument::by_ref`](phper::functions::Argument::by_ref).  Therefore, the type of
+[`Argument::by_ref`](phper::arguments::Argument::by_ref).  Therefore, the type of
 the `count` parameter is no longer long, but a reference.

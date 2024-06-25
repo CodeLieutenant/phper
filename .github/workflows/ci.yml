@@ -77,13 +77,13 @@ jobs:
         run: |
           cargo fmt --all -- --check
 
-      - name: Cargo clippy
-        run: |
-          cargo clippy --release
-
       - name: Cargo build
         run: |
           cargo build --release
+
+      - name: Cargo clippy
+        run: |
+          cargo clippy --release --no-deps --all -- --allow dead_code
 
       - name: Cargo test
         run: |

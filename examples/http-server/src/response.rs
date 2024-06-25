@@ -15,7 +15,7 @@ use axum::{
 };
 use phper::{
     classes::{entity::ClassEntity, StaticStateClass, Visibility},
-    functions::Argument,
+    arguments::Argument,
     objects::StateObject,
 };
 

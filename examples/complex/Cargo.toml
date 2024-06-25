@@ -22,6 +22,7 @@ name = "complex"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
+paste = "^1.0.15"
 phper = { workspace = true }
 
 [dev-dependencies]

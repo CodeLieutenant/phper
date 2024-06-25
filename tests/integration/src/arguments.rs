@@ -9,7 +9,7 @@
 // See the Mulan PSL v2 for more details.
 
 use phper::{
-    alloc::ToRefOwned, arrays::ZArray, functions::Argument, modules::Module, objects::ZObject,
+    alloc::ToRefOwned, arrays::ZArray, arguments::Argument, modules::Module, objects::ZObject,
     values::ZVal,
 };
 

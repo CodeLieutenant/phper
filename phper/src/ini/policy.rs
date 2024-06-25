@@ -11,6 +11,7 @@
 //! Apis relate to [zend_ini_entry_def].
 
 use crate::{c_str, strings::ZString};
+use std::ffi::CString;
 use std::{
     ffi::{c_int, c_uchar, c_void, CStr},
     mem::zeroed,
@@ -19,22 +20,8 @@ use std::{
     str,
 };
 
+use crate::ini::Stage;
 use phper_sys::*;
-
-/// Get the global registered configuration value.
-///
-/// # Examples
-///
-/// ```no_run
-/// use phper::ini::ini_get;
-/// use std::ffi::CStr;
-///
-/// let _foo = ini_get::<bool>("FOO");
-/// let _bar = ini_get::<Option<&CStr>>("BAR");
-/// ```
-pub fn ini_get<T: FromIniValue>(name: &str) -> T {
-    T::from_ini_value(name)
-}
 
 /// Configuration changeable policy.
 #[repr(u32)]
@@ -46,27 +33,9 @@ pub enum Policy {
     /// Windows registry. Entry can be set in `.user.ini`.
     User = PHP_INI_USER,
     /// Entry can be set in `php.ini`, `.htaccess`, `httpd.conf` or `.user.ini`.
-    Perdir = PHP_INI_PERDIR,
+    PerDir = PHP_INI_PERDIR,
     /// Entry can be set in `php.ini` or `httpd.conf`.
     System = PHP_INI_SYSTEM,
-}
-
-/// Configuration for INI Stage.
-#[repr(i32)]
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub enum Stage {
-    /// INI Load Event -> Startup -> PHP Started
-    Startup = ZEND_INI_STAGE_STARTUP as i32,
-    /// INI Event -> PHP Shutting down
-    Shutdown = ZEND_INI_STAGE_SHUTDOWN as i32,
-    /// INI Event -> PHP Module Activated
-    Activate = ZEND_INI_STAGE_ACTIVATE as i32,
-    /// INI Event -> PHP Module Deactivated
-    Deactivate = ZEND_INI_STAGE_DEACTIVATE as i32,
-    /// INI Event -> Value changed with ini_set from PHP
-    Runtime = ZEND_INI_STAGE_RUNTIME as i32,
-    /// INI Event -> Value changed from .htaccess file with php_ini directive
-    Htacces = ZEND_INI_STAGE_HTACCESS as i32,
 }
 
 /// The Type which can transform to an ini value.
@@ -80,37 +49,6 @@ enum PHPIniFunction<T> {
 
     DefaultValue(unsafe extern "C" fn(*const c_char, usize, c_int) -> T),
 }
-
-macro_rules! try_from_stage_int {
-    ($arg:ty) => {
-        impl TryFrom<$arg> for Stage {
-            type Error = Box<dyn std::error::Error>;
-
-            fn try_from(value: $arg) -> Result<Self, Self::Error> {
-                match value as u32 {
-                    ZEND_INI_STAGE_STARTUP => Ok(Stage::Startup),
-                    ZEND_INI_STAGE_SHUTDOWN => Ok(Stage::Shutdown),
-                    ZEND_INI_STAGE_ACTIVATE => Ok(Stage::Activate),
-                    ZEND_INI_STAGE_DEACTIVATE => Ok(Self::Deactivate),
-                    ZEND_INI_STAGE_RUNTIME => Ok(Stage::Runtime),
-                    ZEND_INI_STAGE_HTACCESS => Ok(Stage::Htacces),
-                    _ => Err("Invalid Zend Stage for INI values".into()),
-                }
-            }
-        }
-    };
-}
-
-try_from_stage_int!(i8);
-try_from_stage_int!(i16);
-try_from_stage_int!(i32);
-try_from_stage_int!(i64);
-try_from_stage_int!(isize);
-try_from_stage_int!(u8);
-try_from_stage_int!(u16);
-try_from_stage_int!(u32);
-try_from_stage_int!(u64);
-try_from_stage_int!(usize);
 
 impl IntoIniValue for bool {
     #[inline]
@@ -297,7 +235,7 @@ unsafe extern "C" fn on_modify<T: OnModify>(
 
 /// On INI Change Trait
 pub trait OnModify {
-    /// Called whenever INI has chaged
+    /// Called whenever INI has changed
     fn on_modify(
         &mut self,
         entry: Entry,
@@ -335,16 +273,17 @@ type ZendOnModify = unsafe extern "C" fn(
 
 pub(crate) fn create_ini_entry_ex<T>(
     name: impl AsRef<str>,
-    default_value: impl AsRef<str>,
+    default_value: String,
     modifiable: u32,
     on_modify_impl: Option<T>,
 ) -> zend_ini_entry_def
 where
     T: OnModify,
 {
-    let name = name.as_ref();
-    let default_value = default_value.as_ref();
-    let (modifiable, name_length) = (modifiable as c_uchar, name.len() as u16);
+    let name_length = name.as_ref().len();
+    let name = CString::new(name.as_ref()).unwrap().into_raw();
+    let default_value_len = default_value.len();
+    let default_value = CString::new(default_value).unwrap_or_default().into_raw();
 
     let (callback, arg): (Option<ZendOnModify>, *mut OnModifyCarry<T>) = match on_modify_impl {
         Some(callback) => (
@@ -357,22 +296,21 @@ where
     };
 
     zend_ini_entry_def {
-        name: name.as_ptr().cast(),
-        name_length,
+        name,
+        name_length: name_length as u16,
         on_modify: callback,
         mh_arg1: arg as *mut c_void,
         mh_arg2: null_mut(),
         mh_arg3: null_mut(),
-        value: default_value.as_ptr().cast(),
-        value_length: default_value.len() as u32,
+        value: default_value,
+        value_length: default_value_len as u32,
         displayer: None,
-        modifiable,
+        modifiable: modifiable as c_uchar,
     }
 }
 
 unsafe fn entries(mut ini_entries: Vec<zend_ini_entry_def>) -> *const zend_ini_entry_def {
-    ini_entries.push(zeroed::<zend_ini_entry_def>());
-
+    ini_entries.push(zeroed());
     Box::into_raw(ini_entries.into_boxed_slice()).cast()
 }
 

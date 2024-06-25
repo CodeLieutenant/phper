@@ -8,12 +8,18 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-fn main() {
-    phper_build::register_configures();
+use std::env;
+use std::path::PathBuf;
 
-    #[cfg(target_os = "macos")]
-    {
-        println!("cargo:rustc-link-arg=-undefined");
-        println!("cargo:rustc-link-arg=dynamic_lookup");
-    }
+fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=stubs");
+
+    phper_build::register_all();
+
+    let current_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let stubs = current_dir.join("stubs");
+
+    phper_build::generate_php_function_args(&out_path, &[&stubs], None).unwrap();
 }

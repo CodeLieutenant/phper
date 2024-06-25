@@ -10,26 +10,29 @@
 
 //! Apis relate to [zend_module_entry].
 
-use crate::constants;
+mod extern_c;
+
+use smallvec::SmallVec;
+use std::mem::ManuallyDrop;
+use std::{
+    collections::HashMap,
+    ffi::CString,
+    mem::{size_of, zeroed},
+    os::raw::{c_uchar, c_uint, c_ushort},
+    ptr::{null, null_mut},
+};
+
 use crate::{
-    c_str_ptr,
     classes::{entity::ClassEntity, InterfaceEntity},
-    constants::Constant,
+    constants::{Constant, Flags},
     errors::Throwable,
     functions::{Function, FunctionEntity, FunctionEntry},
     ini,
     sys::*,
-    utils::ensure_end_with_zero,
     values::ZVal,
 };
-use std::{
-    collections::HashMap,
-    ffi::CString,
-    mem::{size_of, take, zeroed},
-    os::raw::{c_int, c_uchar, c_uint, c_ushort},
-    ptr::{null, null_mut},
-    rc::Rc,
-};
+
+use extern_c::{module_info, module_shutdown, module_startup, request_shutdown, request_startup};
 
 /// Global pointer hold the Module builder.
 /// Because PHP is single threaded, so there is no lock here.
@@ -52,102 +55,10 @@ pub struct ModuleInfo {
 }
 
 pub(crate) trait Registerer {
-    fn register(&mut self, module_number: i32) -> Result<(), Box<dyn std::error::Error>>;
-}
-
-unsafe extern "C" fn module_startup(_type: c_int, module_number: c_int) -> c_int {
-    let module: &mut Module = get_module();
-    GLOBAL_MODULE_NUMBER = module_number;
-
-    ini::register(take(&mut module.ini_entities), module_number);
-
-    for mut entity in take(&mut module.entities).into_iter() {
-        if let Err(err) = entity.register(module_number) {
-            crate::output::log(
-                crate::output::LogLevel::Error,
-                format!("Failed to register: {err:?}"),
-            );
-            return ZEND_RESULT_CODE_FAILURE;
-        }
-    }
-
-    if let Some(f) = take(&mut module.module_init) {
-        f(ModuleInfo {
-            ty: _type,
-            number: module_number,
-        });
-    }
-
-    ZEND_RESULT_CODE_SUCCESS
-}
-
-unsafe extern "C" fn module_shutdown(_type: c_int, module_number: c_int) -> c_int {
-    {
-        let module = get_module();
-
-        ini::unregister(module_number);
-
-        if let Some(f) = take(&mut module.module_shutdown) {
-            f(ModuleInfo {
-                ty: _type,
-                number: module_number,
-            });
-        }
-
-        if let Some(ref mut f) = take(&mut module.request_init) {
-            let _b = Box::from_raw(f);
-        }
-
-        if let Some(ref mut f) = take(&mut module.request_shutdown) {
-            let _b = Box::from_raw(f);
-        }
-    }
-
-    ZEND_RESULT_CODE_SUCCESS
-}
-
-unsafe extern "C" fn request_startup(_type: c_int, module_number: c_int) -> c_int {
-    let f = get_module().request_init.unwrap_unchecked();
-
-    f(ModuleInfo {
-        ty: _type,
-        number: module_number,
-    });
-
-    ZEND_RESULT_CODE_SUCCESS
-}
-
-unsafe extern "C" fn request_shutdown(_type: c_int, module_number: c_int) -> c_int {
-    let f = get_module().request_shutdown.unwrap_unchecked();
-
-    f(ModuleInfo {
-        ty: _type,
-        number: module_number,
-    });
-
-    ZEND_RESULT_CODE_SUCCESS
-}
-
-unsafe extern "C" fn module_info(zend_module: *mut zend_module_entry) {
-    let module = get_module();
-
-    php_info_print_table_start();
-    if !module.version.as_bytes().is_empty() {
-        php_info_print_table_row(2, c_str_ptr!("version"), module.version.as_ptr());
-    }
-    if !module.author.as_bytes().is_empty() {
-        php_info_print_table_row(2, c_str_ptr!("authors"), module.author.as_ptr());
-    }
-    for (key, value) in &module.infos {
-        php_info_print_table_row(2, key.as_ptr(), value.as_ptr());
-    }
-    php_info_print_table_end();
-
-    display_ini_entries(zend_module);
+    fn register(self, module_number: i32) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 /// Builder for registering PHP Module.
-#[allow(clippy::type_complexity)]
 #[derive(Default)]
 pub struct Module {
     name: CString,
@@ -157,20 +68,20 @@ pub struct Module {
     module_shutdown: Option<Box<dyn FnOnce(ModuleInfo)>>,
     request_init: Option<&'static dyn Fn(ModuleInfo)>,
     request_shutdown: Option<&'static dyn Fn(ModuleInfo)>,
-    function_entities: Vec<FunctionEntity>,
     entities: Vec<Entities>,
     ini_entities: Vec<zend_ini_entry_def>,
     infos: HashMap<CString, CString>,
+    functions: SmallVec<[zend_function_entry; 64]>,
 }
 
 pub(crate) enum Entities {
     Constant(Constant),
-    Class(ClassEntity),
+    Class(ClassEntity<()>),
     Interface(InterfaceEntity),
 }
 
 impl Registerer for Entities {
-    fn register(&mut self, module_number: i32) -> Result<(), Box<dyn std::error::Error>> {
+    fn register(self, module_number: i32) -> Result<(), Box<dyn std::error::Error>> {
         match self {
             Entities::Constant(con) => con.register(module_number),
             Entities::Class(class) => class.register(module_number),
@@ -183,17 +94,12 @@ impl Module {
     /// Construct the `Module` with base metadata.
     pub fn new(name: impl AsRef<str>, version: impl AsRef<str>, author: impl AsRef<str>) -> Self {
         Self {
-            name: ensure_end_with_zero(name),
-            version: ensure_end_with_zero(version),
-            author: ensure_end_with_zero(author),
-            module_init: None,
-            module_shutdown: None,
-            request_init: None,
-            request_shutdown: None,
-            function_entities: vec![],
-            entities: Default::default(),
-            ini_entities: Default::default(),
-            infos: Default::default(),
+            name: CString::new(name.as_ref()).expect("Failed to allocate CString, param: name"),
+            version: CString::new(version.as_ref())
+                .expect("Failed to allocate CString, param: version"),
+            author: CString::new(author.as_ref())
+                .expect("Failed to allocate CString, param: author"),
+            ..Default::default()
         }
     }
 
@@ -221,26 +127,39 @@ impl Module {
     pub fn add_function<F, Z, E>(
         &mut self,
         name: impl AsRef<str>,
+        arguments: &'static [zend_internal_arg_info],
         handler: F,
-    ) -> &mut FunctionEntity
+    ) -> &mut Self
     where
         F: Fn(&mut [ZVal]) -> Result<Z, E> + 'static,
         Z: Into<ZVal> + 'static,
         E: Throwable + 'static,
     {
-        self.function_entities
-            .push(FunctionEntity::new(name, Rc::new(Function::new(handler))));
-        self.function_entities.last_mut().unwrap()
+        let handler = Box::new(Function::new(handler));
+        let entry = FunctionEntity::new(name, handler, arguments);
+
+        unsafe {
+            let val = ManuallyDrop::new(FunctionEntry::from_function_entity(entry));
+            self.functions.push(val.0);
+        }
+
+        self
     }
 
     /// Register class to module.
-    pub fn add_class(&mut self, class: ClassEntity) {
-        self.entities.push(Entities::Class(class));
+    pub fn add_class<T>(&mut self, class: ClassEntity<T>) -> &mut Self {
+        self.entities.push(Entities::Class(unsafe {
+            std::mem::transmute::<ClassEntity<T>, ClassEntity<()>>(class)
+        }));
+
+        self
     }
 
     /// Register interface to module.
-    pub fn add_interface(&mut self, interface: InterfaceEntity) {
+    pub fn add_interface(&mut self, interface: InterfaceEntity) -> &mut Self {
         self.entities.push(Entities::Interface(interface));
+
+        self
     }
 
     /// Register constant to module.
@@ -248,10 +167,12 @@ impl Module {
         &mut self,
         name: impl AsRef<str>,
         value: impl Into<ZVal>,
-        flags: Option<constants::Flags>,
-    ) {
+        flags: Option<Flags>,
+    ) -> &mut Self {
         self.entities
             .push(Entities::Constant(Constant::new(name, value, flags)));
+
+        self
     }
 
     /// Register ini configuration to module.
@@ -260,14 +181,16 @@ impl Module {
         name: impl AsRef<str>,
         default_value: impl ini::IntoIniValue,
         policy: ini::Policy,
-    ) {
+    ) -> &mut Self {
         let ini = ini::create_ini_entry_ex(
-            name.as_ref(),
+            name,
             default_value.into_ini_value(),
             policy as u32,
             Option::<()>::None,
         );
         self.ini_entities.push(ini);
+
+        self
     }
 
     /// Register info item.
@@ -275,23 +198,23 @@ impl Module {
     /// # Panics
     ///
     /// Panic if key or value contains '\0'.
-    pub fn add_info(&mut self, key: impl Into<String>, value: impl Into<String>) {
+    pub fn add_info(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
         let key = CString::new(key.into()).expect("key contains '\0'");
         let value = CString::new(value.into()).expect("value contains '\0'");
         self.infos.insert(key, value);
+
+        self
     }
 
     #[doc(hidden)]
-    pub unsafe fn module_entry(self) -> *const zend_module_entry {
+    pub unsafe fn module_entry(mut self) -> *const zend_module_entry {
         if !GLOBAL_MODULE_ENTRY.is_null() {
             return GLOBAL_MODULE_ENTRY;
         }
 
-        assert!(!self.name.as_bytes().is_empty(), "module name must be set");
-        assert!(
-            !self.version.as_bytes().is_empty(),
-            "module version must be set"
-        );
+        self.functions.push(zeroed::<zend_function_entry>());
+        self.functions.shrink_to_fit();
+        let fns = ManuallyDrop::new(std::mem::take(&mut self.functions).into_boxed_slice());
 
         let module = Box::leak(Box::new(self));
 
@@ -303,7 +226,7 @@ impl Module {
             ini_entry: null(),
             deps: null(),
             name: module.name.as_ptr(),
-            functions: module.function_entries(),
+            functions: fns.as_ptr(),
             module_startup_func: Some(module_startup),
             module_shutdown_func: Some(module_shutdown),
             request_startup_func: if module.request_init.is_some() {
@@ -320,9 +243,9 @@ impl Module {
             version: module.version.as_ptr(),
             globals_size: 0,
             #[cfg(phper_zts)]
-            globals_id_ptr: std::ptr::null_mut(),
+            globals_id_ptr: null_mut(),
             #[cfg(not(phper_zts))]
-            globals_ptr: std::ptr::null_mut(),
+            globals_ptr: null_mut(),
             globals_ctor: None,
             globals_dtor: None,
             post_deactivate_func: None,
@@ -337,19 +260,5 @@ impl Module {
         GLOBAL_MODULE_ENTRY = Box::into_raw(entry);
 
         GLOBAL_MODULE_ENTRY
-    }
-
-    fn function_entries(&self) -> *const zend_function_entry {
-        if self.function_entities.is_empty() {
-            return null();
-        }
-
-        let mut entries = Vec::new();
-        for f in &self.function_entities {
-            entries.push(unsafe { FunctionEntry::from_function_entity(f) });
-        }
-        entries.push(unsafe { zeroed::<zend_function_entry>() });
-
-        Box::into_raw(entries.into_boxed_slice()).cast()
     }
 }
